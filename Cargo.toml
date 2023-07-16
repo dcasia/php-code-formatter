@@ -1,12 +1,12 @@
 [package]
-name = "rust-ecs"
+name = "php-code-formatter"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.71"
-indoc = "2.0.3"
-tree-sitter = "0.20.10"
+anyhow = "^1.0"
+indoc = "^2.0"
+tree-sitter = "^0.20"
 
 [build-dependencies]
-cc = "1.0.79"
+cc = "^1.0"

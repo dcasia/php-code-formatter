@@ -26,7 +26,7 @@ impl HeaderLineFixer {
 
 impl Fixer for HeaderLineFixer {
     fn query(&self) -> &str {
-        "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration)+ @use"
+        "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration) @use"
     }
 
     fn fix(&mut self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
@@ -55,10 +55,10 @@ mod tests {
         let mut input = indoc! {"
         <?php
         declare(strict_types = 1);
-        namespace App\\Console\\Commands\\Laravel;
-        use Illuminate\\Console\\One;
-        use Illuminate\\Console\\Two;
-        class EnvironmentEncryptCommand {}
+        namespace App\\Console;
+        use App\\One;
+        use App\\Two;
+        class Example {}
         "};
 
         let mut output = indoc! {"
@@ -66,12 +66,34 @@ mod tests {
 
         declare(strict_types = 1);
 
-        namespace App\\Console\\Commands\\Laravel;
+        namespace App\\Console;
 
-        use Illuminate\\Console\\One;
-        use Illuminate\\Console\\Two;
+        use App\\One;
+        use App\\Two;
 
-        class EnvironmentEncryptCommand {}
+        class Example {}
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_correctly_fixes_statements_defined_on_the_same_line() {
+        let mut input = indoc! {"
+        <?phpdeclare(strict_types = 1);namespace App\\Console;use App\\One;use App\\Two;class Example {}
+        "};
+
+        let mut output = indoc! {"
+        <?php
+
+        declare(strict_types = 1);
+
+        namespace App\\Console;
+
+        use App\\One;
+        use App\\Two;
+
+        class Example {}
         "};
 
         assert_inputs(input, output);
