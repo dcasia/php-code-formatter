@@ -1,0 +1,12 @@
+[package]
+name = "rust-ecs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.71"
+indoc = "2.0.3"
+tree-sitter = "0.20.10"
+
+[build-dependencies]
+cc = "1.0.79"
