@@ -6,7 +6,7 @@ pub struct HeaderLineFixer {}
 
 impl HeaderLineFixer {
     fn apply_fixer(&self, source_code: &mut String, current_node: &Node, next_node: &Node) -> anyhow::Result<Option<InputEdit>> {
-        let mut tokens = current_node.utf8_text(&source_code.as_bytes())?;
+        let tokens = current_node.utf8_text(&source_code.as_bytes())?;
         let tokens = vec![tokens, "\n"];
         let tokens = tokens.join("");
         let tokens = tokens.as_str();
@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn it_adds_new_line_where_necessary() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         declare(strict_types = 1);
         namespace App\\Console;
@@ -61,7 +61,7 @@ mod tests {
         class Example {}
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
 
         declare(strict_types = 1);
@@ -79,11 +79,11 @@ mod tests {
 
     #[test]
     fn it_correctly_fixes_statements_defined_on_the_same_line() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?phpdeclare(strict_types = 1);namespace App\\Console;use App\\One;use App\\Two;class Example {}
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
 
         declare(strict_types = 1);

@@ -34,12 +34,12 @@ mod tests {
 
     #[test]
     fn it_add_space_between_equal_token() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         declare(strict_types=1);
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         declare(strict_types = 1);
         "};
@@ -49,12 +49,12 @@ mod tests {
 
     #[test]
     fn it_keeps_the_original_integer_value() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         declare(strict_types=0);
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         declare(strict_types = 0);
         "};
@@ -64,12 +64,12 @@ mod tests {
 
     #[test]
     fn it_removes_spaces_between_open_close_parenthesis() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         declare( strict_types=1 );
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         declare(strict_types = 1);
         "};
@@ -79,12 +79,12 @@ mod tests {
 
     #[test]
     fn it_removes_excessive_spaces() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         declare(     strict_types      =        1      );
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         declare(strict_types = 1);
         "};

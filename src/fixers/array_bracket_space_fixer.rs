@@ -36,12 +36,12 @@ mod tests {
 
     #[test]
     fn it_add_spaces_around_brackets_and_inner_elements() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         $value = [1,2,3];
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         $value = [ 1, 2, 3 ];
         "};
@@ -51,12 +51,12 @@ mod tests {
 
     #[test]
     fn it_add_space_within_nested_arrays() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         $value = [1,2,[a,b,c],3];
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         $value = [ 1, 2, [ a, b, c ], 3 ];
         "};
@@ -66,13 +66,13 @@ mod tests {
 
     #[test]
     fn it_fix_array_that_contains_wierd_spaces_from_start() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         $value = [    1,2  ,[a,  b, c
         ], 3    ];
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php
         $value = [ 1, 2, [ a, b, c ], 3 ];
         "};

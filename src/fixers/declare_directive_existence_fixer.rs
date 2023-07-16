@@ -48,28 +48,28 @@ mod tests {
 
     #[test]
     fn it_append_the_statement_if_missing() {
-        let mut input = indoc! {"<?php"};
-        let mut output = indoc! {"<?php declare(strict_types = 1);"};
+        let input = indoc! {"<?php"};
+        let output = indoc! {"<?php declare(strict_types = 1);"};
 
         assert_inputs(input, output);
     }
 
     #[test]
     fn it_does_nothing_if_directive_is_already_defined() {
-        let mut input = indoc! {"<?php declare(strict_types = 0);"};
-        let mut output = indoc! {"<?php declare(strict_types = 0);"};
+        let input = indoc! {"<?php declare(strict_types = 0);"};
+        let output = indoc! {"<?php declare(strict_types = 0);"};
 
         assert_inputs(input, output);
     }
 
     #[test]
     fn it_add_the_directive_if_first_token_is_not_declare() {
-        let mut input = indoc! {"
+        let input = indoc! {"
         <?php
         namespace App;
         "};
 
-        let mut output = indoc! {"
+        let output = indoc! {"
         <?php declare(strict_types = 1);
         namespace App;
         "};

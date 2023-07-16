@@ -1,16 +1,6 @@
-#![allow(warnings, unused)]
-
-use std::borrow::Borrow;
-use std::borrow::BorrowMut;
-use std::cell::RefCell;
 use std::fs;
-use std::io::Read;
-use std::process::exit;
-
-use tree_sitter::{InputEdit, Language, Node, Parser, Point, Query, QueryCapture, QueryCursor, QueryError, QueryMatch, QueryPredicate, Range, Tree};
-
-use crate::array_bracket_space_fixer::ArrayBracketSpaceFixer;
-use crate::fixers::*;
+use tree_sitter::{InputEdit, Language, Node, Parser, Point, Query, QueryCursor, Tree};
+use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
 use crate::fixers::declare_directive_existence_fixer::DeclareDirectiveExistenceFixer;
 use crate::fixers::declare_directive_space_fixer::DeclareDirectiveSpaceFixer;
 use crate::fixers::header_line_fixer::HeaderLineFixer;
@@ -35,7 +25,7 @@ pub trait Fixer {
         loop {
             let string = String::new();
             let mut new_tree = tree.clone();
-            let mut matches = cursor.matches(&query, new_tree.root_node(), string.as_bytes());
+            let matches = cursor.matches(&query, new_tree.root_node(), string.as_bytes());
 
             let mut should_break = true;
 
