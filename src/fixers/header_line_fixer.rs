@@ -1,4 +1,4 @@
-use tree_sitter::{InputEdit, Node};
+use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::Fixer;
 
@@ -29,7 +29,7 @@ impl Fixer for HeaderLineFixer {
         "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>> {
         match node.next_sibling() {
             None => Ok(None),
             Some(next_node) => self.apply_fixer(source_code, node, &next_node)

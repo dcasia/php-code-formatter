@@ -1,4 +1,4 @@
-use tree_sitter::{InputEdit, Node};
+use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::{Fixer, WHITE_SPACE};
 
@@ -9,7 +9,7 @@ impl Fixer for DeclareDirectiveSpaceFixer {
         "(declare_statement (declare_directive) @fix-equal) @fix-parenthesis"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>> {
         self.build_sequence(node, source_code, |token| {
             match token {
                 "=" => vec![WHITE_SPACE, token, WHITE_SPACE],

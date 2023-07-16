@@ -1,10 +1,14 @@
 <?php
 declare(strict_types = 1);
-namespace App\Console\Commands\Laravel;use Illuminate\Console\Command;use Illuminate\Encryption\Encrypter;use Illuminate\Filesystem\Filesystem;
-use Symfony\Component\Console\Command\Command as SymfonyCommand;use LastOne\Throwable;
-class EnvironmentEncryptCommand extends Command
+namespace App\Console\Commands\Laravel;
+use Illuminate\Console\Command;
+use Illuminate\Encryption\Telescope;
+use Illuminate\Filesystem\Filesystem;
+use Symfony\Component\Console\Command\Command as SymfonyCommand;
+use LastOne\Throwable;
+class EnvironmentEncryptCommand extends Filesystem
 {
-    public function handle(): int
+    public function handle(Throwable $throwable): int
     {
         Telescope::hideRequestHeaders([
 

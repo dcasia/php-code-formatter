@@ -1,9 +1,12 @@
 use std::fs;
+
 use tree_sitter::{InputEdit, Language, Node, Parser, Point, Query, QueryCursor, Tree};
+
 use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
 use crate::fixers::declare_directive_existence_fixer::DeclareDirectiveExistenceFixer;
 use crate::fixers::declare_directive_space_fixer::DeclareDirectiveSpaceFixer;
 use crate::fixers::header_line_fixer::HeaderLineFixer;
+use crate::fixers::remove_unused_imports_fixer::RemoveUnusedImportsFixer;
 
 mod fixers;
 mod test_utilities;
@@ -16,7 +19,7 @@ const NEW_LINE: &str = "\n\n";
 pub trait Fixer {
     fn query(&self) -> &str;
 
-    fn fix(&mut self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>>;
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>>;
 
     fn exec(&mut self, tree: &mut Tree, parser: &mut Parser, source_code: &mut String, language: &Language) -> anyhow::Result<()> {
         let mut cursor = QueryCursor::new();
@@ -31,7 +34,7 @@ pub trait Fixer {
 
             'top: for each_match in matches {
                 for capture in each_match.captures {
-                    if let Some(edit) = self.fix(&capture.node, source_code)? {
+                    if let Some(edit) = self.fix(&capture.node, source_code, &tree)? {
                         new_tree.edit(&edit);
                         should_break = false;
                         *tree = parser.parse(source_code.as_bytes(), Some(&new_tree)).unwrap();
@@ -60,6 +63,12 @@ pub trait Fixer {
                 node.start_position().column + tokens.len(),
             ),
         }
+    }
+
+    fn remove_node(&self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
+        source_code.replace_range(node.byte_range(), "");
+
+        Ok(Some(self.compute_edit(node, "")))
     }
 
     fn build_sequence(&mut self, node: &Node, source_code: &mut String, callback: fn(token: &str) -> Vec<&str>) -> anyhow::Result<Option<InputEdit>> {
@@ -95,10 +104,11 @@ fn main() -> anyhow::Result<()> {
     let mut source_code = fs::read_to_string("src/Sample.php")?;
     let mut tree = parser.parse(&source_code, None).unwrap();
 
-    let fixers: [fn() -> Box<dyn Fixer>; 4] = [
+    let fixers: [fn() -> Box<dyn Fixer>; 5] = [
         || Box::new(ArrayBracketSpaceFixer {}),
         || Box::new(DeclareDirectiveSpaceFixer {}),
         || Box::new(DeclareDirectiveExistenceFixer {}),
+        || Box::new(RemoveUnusedImportsFixer {}),
         || Box::new(HeaderLineFixer {}),
     ];
 

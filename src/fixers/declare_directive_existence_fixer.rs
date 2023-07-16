@@ -1,4 +1,4 @@
-use tree_sitter::{InputEdit, Node};
+use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::Fixer;
 
@@ -19,7 +19,7 @@ impl Fixer for DeclareDirectiveExistenceFixer {
         "(php_tag) @tag"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>> {
         match node.next_sibling() {
             None => self.insert_token(node, source_code),
             Some(next_node) => {
