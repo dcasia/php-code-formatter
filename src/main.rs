@@ -4,6 +4,11 @@
 use std::fs;
 
 use tree_sitter::{InputEdit, Language, Node, Parser, Point, Query, QueryCursor, Tree};
+use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
+use crate::fixers::declare_directive_existence_fixer::DeclareDirectiveExistenceFixer;
+use crate::fixers::declare_directive_space_fixer::DeclareDirectiveSpaceFixer;
+use crate::fixers::header_line_fixer::HeaderLineFixer;
+use crate::fixers::remove_unused_imports_fixer::RemoveUnusedImportsFixer;
 
 mod fixers;
 mod test_utilities;
@@ -18,7 +23,7 @@ pub trait Fixer {
 
     fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String>;
 
-    fn exec(&mut self, mut tree: Tree, parser: &mut Parser, source_code: &mut String, language: &Language) -> anyhow::Result<()> {
+    fn exec(&mut self, mut tree: Tree, parser: &mut Parser, source_code: &mut String, language: &Language) -> anyhow::Result<Tree> {
         let mut cursor = QueryCursor::new();
         let query = Query::new(*language, self.query())?;
 
@@ -61,7 +66,7 @@ pub trait Fixer {
             }
         }
 
-        Ok(())
+        Ok(tree)
     }
 
     fn compute_edit(&self, node: &Node, tokens: &str) -> InputEdit {
@@ -98,109 +103,28 @@ pub trait Fixer {
     }
 }
 
+
 fn main() -> anyhow::Result<()> {
     let mut parser = Parser::new();
     let language = unsafe { tree_sitter_php() };
+
     parser.set_language(language)?;
 
     let mut source_code = fs::read_to_string("src/Sample.php")?;
     let mut tree = parser.parse(&source_code, None).unwrap();
 
-    // let mut edits = vec![];
+    let fixers: [fn() -> Box<dyn Fixer>; 1] = [
+        || Box::new(ArrayBracketSpaceFixer {}),
+        // || Box::new(DeclareDirectiveSpaceFixer {}),
+        // || Box::new(DeclareDirectiveExistenceFixer {}),
+        // || Box::new(HeaderLineFixer {}),
+    ];
 
-    //
-    // for mut node in nodes.iter_mut() {
-    //     let new_source_code = "declare( strict_types = 1 );".to_string();
-    //
-    //     let edit = InputEdit {
-    //         start_byte: node.start_byte(),
-    //         start_position: node.start_position(),
-    //         old_end_byte: node.end_byte(),
-    //         old_end_position: node.end_position(),
-    //         new_end_byte: node.start_byte() + new_source_code.len(),
-    //         new_end_position: Point::new(
-    //             node.start_position().row,
-    //             node.start_position().column + new_source_code.len(),
-    //         ),
-    //     };
-    //
-    //     // edits.push((edit, new_source_code));
-    // }
-    //
-    // let mut previous: Option<InputEdit> = None;
-    //
-    // for (edit, new_code) in edits {
-    //     let mut current_edit = edit;
-    //
-    //     println!("{:?}", current_edit);
-    //
-    //     if let Some(previous_edit) = previous {
-    //         current_edit.start_byte += previous_edit.start_byte - previous_edit.old_end_byte;
-    //         current_edit.old_end_byte += previous_edit.new_end_byte - previous_edit.old_end_byte;
-    //         current_edit.new_end_byte += previous_edit.old_end_byte - previous_edit.new_end_byte;
-    //         current_edit.old_end_position = Point {
-    //             row: current_edit.old_end_position.row + previous_edit.old_end_position.row - previous_edit.old_end_position.row,
-    //             column: current_edit.old_end_position.row + previous_edit.old_end_position.column - previous_edit.old_end_position.column,
-    //         };
-    //
-    //         current_edit.new_end_position = Point {
-    //             row: current_edit.new_end_position.row + previous_edit.new_end_position.row - previous_edit.old_end_position.row,
-    //             column: current_edit.new_end_position.column + previous_edit.new_end_position.column - previous_edit.old_end_position.column,
-    //         };
-    //     }
-    //
-    //     tree.edit(&current_edit);
-    //     source_code.replace_range(current_edit.start_byte..current_edit.old_end_byte, new_code.as_str());
-    //     previous = Some(current_edit)
-    // }
-
-    // for each_match in matches {
-    //     if let Some(node) = each_match.nodes_for_capture_index(0).next() {
-    //
-    //     }
-    // }
+    for fixer in fixers {
+        tree = fixer().exec(tree, &mut parser, &mut source_code, &language)?;
+    }
 
     fs::write("src/Sample2.php", tree.root_node().utf8_text(source_code.as_bytes())?)?;
 
     Ok(())
 }
-
-// fn main() -> anyhow::Result<()> {
-//     let mut parser = Parser::new();
-//     let language = unsafe { tree_sitter_php() };
-//
-//     parser.set_language(language)?;
-//
-//     let fixers: [fn() -> Box<dyn Fixer>; 5] = [
-//         || Box::new(ArrayBracketSpaceFixer {}),
-//         || Box::new(DeclareDirectiveSpaceFixer {}),
-//         || Box::new(DeclareDirectiveExistenceFixer {}),
-//         || Box::new(RemoveUnusedImportsFixer {}),
-//         || Box::new(HeaderLineFixer {}),
-//     ];
-//
-//     let walker = WalkDir::new("/home/ziva-backend/app");
-//
-//     for entry in walker {
-//         let entry = entry.unwrap();
-//
-//         if entry.file_type().is_dir() {
-//             continue;
-//         }
-//
-//         if entry.file_name().to_str().unwrap().ends_with(".php") {
-//             let mut source_code = fs::read_to_string(entry.path())?;
-//             let mut tree = parser.parse(&source_code, None).unwrap();
-//
-//             for fixer in fixers {
-//                 fixer().exec(&mut tree, &mut parser, &mut source_code, &language)?;
-//             }
-//
-//             fs::write(entry.path(), tree.root_node().utf8_text(source_code.as_bytes())?)?;
-//
-//             println!("{:?}", entry.path().display());
-//         }
-//     }
-//
-//     Ok(())
-// }
