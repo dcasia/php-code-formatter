@@ -11,7 +11,7 @@ pub fn run_fixer(source_code: String, mut fixer: impl Fixer) -> String {
 
     let mut tree = parser.parse(&source_code, None).unwrap();
 
-    fixer.exec(&mut tree, &mut parser, &mut source_code, &language);
+    fixer.exec(tree, &mut parser, &mut source_code, &language);
 
     source_code
 }

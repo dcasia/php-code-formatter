@@ -19,17 +19,18 @@ impl Fixer for DeclareDirectiveExistenceFixer {
         "(php_tag) @tag"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>> {
-        match node.next_sibling() {
-            None => self.insert_token(node, source_code),
-            Some(next_node) => {
-                if next_node.kind() != "declare_statement" {
-                    return self.insert_token(node, source_code);
-                }
-
-                Ok(None)
-            }
-        }
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
+        Ok(String::new())
+        // match node.next_sibling() {
+        //     None => self.insert_token(node, source_code),
+        //     Some(next_node) => {
+        //         if next_node.kind() != "declare_statement" {
+        //             return self.insert_token(node, source_code);
+        //         }
+        //
+        //         Ok(None)
+        //     }
+        // }
     }
 }
 

@@ -9,13 +9,15 @@ impl Fixer for DeclareDirectiveSpaceFixer {
         "(declare_statement (declare_directive) @fix-equal) @fix-parenthesis"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>> {
-        self.build_sequence(node, source_code, |token| {
-            match token {
-                "=" => vec![WHITE_SPACE, token, WHITE_SPACE],
-                _ => vec![token]
-            }
-        })
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
+        // self.build_sequence(node, source_code, |token| {
+        //     match token {
+        //         "=" => vec![WHITE_SPACE, token, WHITE_SPACE],
+        //         _ => vec![token]
+        //     }
+        // })
+
+        Ok(String::new())
     }
 }
 

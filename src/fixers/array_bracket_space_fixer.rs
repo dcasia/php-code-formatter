@@ -9,15 +9,18 @@ impl Fixer for ArrayBracketSpaceFixer {
         "(array_creation_expression) @value"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<InputEdit>> {
-        self.build_sequence(node, source_code, |token| {
-            match token {
-                "[" => vec![token, WHITE_SPACE],
-                "]" => vec![WHITE_SPACE, token],
-                "," => vec![token, WHITE_SPACE],
-                _ => vec![token]
-            }
-        })
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
+        let tokens: Vec<&str> = node
+            .children(&mut node.walk())
+            .map(|child| match child.kind() {
+                "[" => "[ ",
+                "]" => " ]",
+                "," => ", ",
+                _ => child.utf8_text(source_code.as_bytes()).unwrap()
+            })
+            .collect();
+
+        Ok(tokens.join(""))
     }
 }
 
