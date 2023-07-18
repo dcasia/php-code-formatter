@@ -1,5 +1,5 @@
 use indoc::indoc;
-use tree_sitter::{InputEdit, Node, Query, QueryCursor, Tree};
+use tree_sitter::{Node, Query, QueryCursor, Tree};
 
 use crate::Fixer;
 
@@ -10,38 +10,37 @@ impl Fixer for RemoveUnusedImportsFixer {
         "(namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
-        Ok(String::new())
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
         // Collect all static method calls Class::method()
-        // let query = Query::new(node.language(), indoc! {"
-        //     (scoped_call_expression scope: (name) @static-methods)
-        //     (named_type (name) @function-arguments)
-        //     (base_clause (name) @class-extends)
-        // "})?;
-        //
-        // let mut cursor = QueryCursor::new();
-        //
-        // let captures = cursor.matches(&query, tree.root_node(), source_code.as_bytes());
-        //
-        // let static_calls: Vec<&str> = captures
-        //     .flat_map(|captures| captures.captures)
-        //     .map(|capture| capture.node.utf8_text(source_code.as_bytes()).expect("Failed to get text from capture"))
-        //     .collect();
-        //
-        // let sub_query = Query::new(node.language(), "(namespace_use_clause (qualified_name (name) @name))")?;
-        // let mut sub_cursor = QueryCursor::new();
-        // let mut clone_source_code = source_code.clone();
-        // let mut finding = sub_cursor.matches(&sub_query, *node, clone_source_code.as_bytes());
-        //
-        // if let Some(next_match) = finding.next() {
-        //     if let Some(next_capture) = next_match.nodes_for_capture_index(0).next() {
-        //         if static_calls.contains(&next_capture.utf8_text(source_code.as_bytes())?) == false {
-        //             return self.remove_node(node, source_code);
-        //         }
-        //     }
-        // }
-        //
-        // Ok(None)
+        let query = Query::new(node.language(), indoc! {"
+            (scoped_call_expression scope: (name) @static-methods)
+            (named_type (name) @function-arguments)
+            (base_clause (name) @class-extends)
+        "})?;
+
+        let mut cursor = QueryCursor::new();
+
+        let captures = cursor.matches(&query, tree.root_node(), source_code.as_bytes());
+
+        let static_calls: Vec<&str> = captures
+            .flat_map(|captures| captures.captures)
+            .map(|capture| capture.node.utf8_text(source_code.as_bytes()).expect("Failed to get text from capture"))
+            .collect();
+
+        let sub_query = Query::new(node.language(), "(namespace_use_clause (qualified_name (name) @name))")?;
+        let mut sub_cursor = QueryCursor::new();
+        let mut clone_source_code = source_code.clone();
+        let mut finding = sub_cursor.matches(&sub_query, *node, clone_source_code.as_bytes());
+
+        if let Some(next_match) = finding.next() {
+            if let Some(next_capture) = next_match.nodes_for_capture_index(0).next() {
+                if static_calls.contains(&next_capture.utf8_text(source_code.as_bytes())?) == false {
+                    return Ok(Some("".as_bytes().to_vec()));
+                }
+            }
+        }
+
+        Ok(None)
     }
 }
 

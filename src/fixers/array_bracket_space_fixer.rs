@@ -1,6 +1,6 @@
 use tree_sitter::{Node, Tree};
 
-use crate::{Fixer};
+use crate::Fixer;
 
 pub struct ArrayBracketSpaceFixer {}
 
@@ -9,8 +9,8 @@ impl Fixer for ArrayBracketSpaceFixer {
         "(array_creation_expression) @value"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
-        let tokens: Vec<&str> = node
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+        let tokens: Vec<u8> = node
             .children(&mut node.walk())
             .map(|child| match child.kind() {
                 "[" => {
@@ -18,7 +18,7 @@ impl Fixer for ArrayBracketSpaceFixer {
                         if next.kind() == "]" { return "["; }
                     }
                     "[ "
-                },
+                }
                 "]" => {
                     if let Some(next) = child.prev_sibling() {
                         if next.kind() == "[" { return "]"; }
@@ -26,11 +26,12 @@ impl Fixer for ArrayBracketSpaceFixer {
                     " ]"
                 }
                 "," => ", ",
-                _ => child.utf8_text(source_code.as_bytes()).unwrap()
+                _ => &source_code[child.byte_range()]
             })
+            .flat_map(|token| token.as_bytes().to_owned())
             .collect();
 
-        Ok(tokens.join(""))
+        Ok(Some(tokens))
     }
 }
 

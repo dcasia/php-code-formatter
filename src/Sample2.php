@@ -14,6 +14,6 @@ class EnvironmentEncryptCommand extends Filesystem
 {
     public function handle(Throwable $throwable): int
     {
-        $value = [ 1, 2, 3, new stdClass([ 1, 2, 3 ]), 4 ];
+        $value = [1,2,3,new stdClass([1,2,3]),4];
     }
 }

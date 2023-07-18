@@ -1,6 +1,7 @@
-use tree_sitter::{InputEdit, Node, Tree};
+use std::ops::Deref;
+use tree_sitter::{Node, Tree};
 
-use crate::{Fixer, WHITE_SPACE};
+use crate::{Fixer};
 
 pub struct DeclareDirectiveSpaceFixer {}
 
@@ -9,15 +10,17 @@ impl Fixer for DeclareDirectiveSpaceFixer {
         "(declare_statement (declare_directive) @fix-equal) @fix-parenthesis"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
-        // self.build_sequence(node, source_code, |token| {
-        //     match token {
-        //         "=" => vec![WHITE_SPACE, token, WHITE_SPACE],
-        //         _ => vec![token]
-        //     }
-        // })
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+        let tokens: Vec<u8> = node
+            .children(&mut node.walk())
+            .map(|child| match child.kind() {
+                "=" => " = ",
+                _ => &source_code[child.byte_range()]
+            })
+            .flat_map(|token| token.as_bytes().to_owned())
+            .collect();
 
-        Ok(String::new())
+        Ok(Some(tokens))
     }
 }
 

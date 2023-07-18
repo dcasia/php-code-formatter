@@ -1,36 +1,29 @@
-use tree_sitter::{InputEdit, Node, Tree};
+use tree_sitter::{Node, Tree};
 
 use crate::Fixer;
 
 pub struct DeclareDirectiveExistenceFixer {}
 
-impl DeclareDirectiveExistenceFixer {
-    fn insert_token(&self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
-        let tokens = "<?php declare(strict_types = 1);";
-
-        source_code.replace_range(node.byte_range(), tokens);
-
-        return Ok(Some(self.compute_edit(node, &tokens)));
-    }
-}
+impl DeclareDirectiveExistenceFixer {}
 
 impl Fixer for DeclareDirectiveExistenceFixer {
     fn query(&self) -> &str {
         "(php_tag) @tag"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
-        Ok(String::new())
-        // match node.next_sibling() {
-        //     None => self.insert_token(node, source_code),
-        //     Some(next_node) => {
-        //         if next_node.kind() != "declare_statement" {
-        //             return self.insert_token(node, source_code);
-        //         }
-        //
-        //         Ok(None)
-        //     }
-        // }
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+        let token = Vec::from("<?php declare(strict_types = 1);");
+
+        match node.next_sibling() {
+            None => Ok(Some(token)),
+            Some(next_node) => {
+                if next_node.kind() != "declare_statement" {
+                    return Ok(Some(token));
+                }
+
+                Ok(None)
+            }
+        }
     }
 }
 

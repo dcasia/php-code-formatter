@@ -1,23 +1,23 @@
-use tree_sitter::{InputEdit, Node, Tree};
+use tree_sitter::{Node, Tree};
 
-use crate::Fixer;
+use crate::{Fixer, NEW_LINE};
 
 pub struct HeaderLineFixer {}
 
 impl HeaderLineFixer {
-    fn apply_fixer(&self, source_code: &mut String, current_node: &Node, next_node: &Node) -> anyhow::Result<Option<InputEdit>> {
-        let tokens = current_node.utf8_text(&source_code.as_bytes())?;
-        let tokens = vec![tokens, "\n"];
-        let tokens = tokens.join("");
-        let tokens = tokens.as_str();
+    fn apply_fixer(&self, source_code: &mut String, current_node: &Node, next_node: &Node) -> anyhow::Result<Option<Vec<u8>>> {
+        let mut tokens = source_code[current_node.byte_range()].as_bytes().to_vec();
+        tokens.push(NEW_LINE);
 
         let current_node_row = current_node.start_position().row;
         let next_node_row = next_node.start_position().row;
 
-        if current_node_row == next_node_row || (current_node_row + 1 == next_node_row && current_node.kind() != next_node.kind()) {
-            source_code.replace_range(current_node.byte_range(), tokens);
+        if current_node_row == next_node_row {
+            return Ok(Some(tokens));
+        }
 
-            return Ok(Some(self.compute_edit(current_node, &tokens)));
+        if current_node_row + 1 == next_node_row && current_node.kind() != next_node.kind() {
+            return Ok(Some(tokens));
         }
 
         return Ok(None);
@@ -29,20 +29,19 @@ impl Fixer for HeaderLineFixer {
         "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<String> {
-        Ok(String::new())
-        // match node.next_sibling() {
-        //     None => Ok(None),
-        //     Some(next_node) => self.apply_fixer(source_code, node, &next_node)
-        // }
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+        match node.next_sibling() {
+            None => Ok(None),
+            Some(next_node) => self.apply_fixer(source_code, node, &next_node)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use crate::fixers::header_line_fixer::HeaderLineFixer;
 
+    use crate::fixers::header_line_fixer::HeaderLineFixer;
     use crate::test_utilities::run_fixer;
 
     pub fn assert_inputs(input: &str, output: &str) {
