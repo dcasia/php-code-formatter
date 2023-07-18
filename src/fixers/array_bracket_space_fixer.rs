@@ -1,6 +1,6 @@
-use tree_sitter::{InputEdit, Node, Tree};
+use tree_sitter::{Node, Tree};
 
-use crate::{Fixer, WHITE_SPACE};
+use crate::{Fixer};
 
 pub struct ArrayBracketSpaceFixer {}
 
@@ -13,8 +13,18 @@ impl Fixer for ArrayBracketSpaceFixer {
         let tokens: Vec<&str> = node
             .children(&mut node.walk())
             .map(|child| match child.kind() {
-                "[" => "[ ",
-                "]" => " ]",
+                "[" => {
+                    if let Some(next) = child.next_sibling() {
+                        if next.kind() == "]" { return "["; }
+                    }
+                    "[ "
+                },
+                "]" => {
+                    if let Some(next) = child.prev_sibling() {
+                        if next.kind() == "[" { return "]"; }
+                    }
+                    " ]"
+                }
                 "," => ", ",
                 _ => child.utf8_text(source_code.as_bytes()).unwrap()
             })
@@ -81,5 +91,12 @@ mod tests {
         "};
 
         assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_does_not_add_spaces_within_blank_arrays() {
+        let input_output = indoc! {"<?php $value = [];"};
+
+        assert_inputs(input_output, input_output);
     }
 }
