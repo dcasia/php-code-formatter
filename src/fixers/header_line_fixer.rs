@@ -1,11 +1,11 @@
-use tree_sitter::{Node, Tree};
+use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::{Fixer, NEW_LINE};
 
 pub struct HeaderLineFixer {}
 
 impl HeaderLineFixer {
-    fn apply_fixer(&self, source_code: &mut String, current_node: &Node, next_node: &Node) -> anyhow::Result<Option<Vec<u8>>> {
+    fn apply_fixer(&self, source_code: &mut String, current_node: &Node, next_node: &Node) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
         let mut tokens = source_code[current_node.byte_range()].as_bytes().to_vec();
         tokens.push(NEW_LINE);
 
@@ -13,14 +13,14 @@ impl HeaderLineFixer {
         let next_node_row = next_node.start_position().row;
 
         if current_node_row == next_node_row {
-            return Ok(Some(tokens));
+            return Ok((Some(tokens), None));
         }
 
         if current_node_row + 1 == next_node_row && current_node.kind() != next_node.kind() {
-            return Ok(Some(tokens));
+            return Ok((Some(tokens), None));
         }
 
-        return Ok(None);
+        return Ok((None, None));
     }
 }
 
@@ -29,9 +29,9 @@ impl Fixer for HeaderLineFixer {
         "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
         match node.next_sibling() {
-            None => Ok(None),
+            None => Ok((None, None)),
             Some(next_node) => self.apply_fixer(source_code, node, &next_node)
         }
     }

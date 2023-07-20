@@ -1,5 +1,5 @@
 use indoc::indoc;
-use tree_sitter::{Node, Query, QueryCursor, Tree};
+use tree_sitter::{InputEdit, Node, Query, QueryCursor, Tree};
 
 use crate::Fixer;
 
@@ -10,7 +10,7 @@ impl Fixer for RemoveUnusedImportsFixer {
         "(namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
         // Collect all static method calls Class::method()
         let query = Query::new(node.language(), indoc! {"
             (scoped_call_expression scope: (name) @static-methods)
@@ -35,12 +35,12 @@ impl Fixer for RemoveUnusedImportsFixer {
         if let Some(next_match) = finding.next() {
             if let Some(next_capture) = next_match.nodes_for_capture_index(0).next() {
                 if static_calls.contains(&next_capture.utf8_text(source_code.as_bytes())?) == false {
-                    return Ok(Some("".as_bytes().to_vec()));
+                    return Ok((Some("".as_bytes().to_vec()), None));
                 }
             }
         }
 
-        Ok(None)
+        Ok((None, None))
     }
 }
 

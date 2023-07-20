@@ -1,4 +1,4 @@
-use tree_sitter::{Node, Tree};
+use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::Fixer;
 
@@ -11,17 +11,17 @@ impl Fixer for DeclareDirectiveExistenceFixer {
         "(php_tag) @tag"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
         let token = Vec::from("<?php declare(strict_types = 1);");
 
         match node.next_sibling() {
-            None => Ok(Some(token)),
+            None => Ok((Some(token), None)),
             Some(next_node) => {
                 if next_node.kind() != "declare_statement" {
-                    return Ok(Some(token));
+                    return Ok((Some(token), None));
                 }
 
-                Ok(None)
+                Ok((None, None))
             }
         }
     }

@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use tree_sitter::{Node, Tree};
+use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::{Fixer};
 
@@ -10,7 +10,7 @@ impl Fixer for DeclareDirectiveSpaceFixer {
         "(declare_statement (declare_directive) @fix-equal) @fix-parenthesis"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>> {
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
         let tokens: Vec<u8> = node
             .children(&mut node.walk())
             .map(|child| match child.kind() {
@@ -20,7 +20,7 @@ impl Fixer for DeclareDirectiveSpaceFixer {
             .flat_map(|token| token.as_bytes().to_owned())
             .collect();
 
-        Ok(Some(tokens))
+        Ok((Some(tokens), None))
     }
 }
 

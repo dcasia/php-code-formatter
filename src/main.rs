@@ -8,7 +8,9 @@ use tree_sitter::{InputEdit, Language, Node, Parser, Point, Query, QueryCursor, 
 use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
 use crate::fixers::declare_directive_existence_fixer::DeclareDirectiveExistenceFixer;
 use crate::fixers::declare_directive_space_fixer::DeclareDirectiveSpaceFixer;
+use crate::fixers::function_arguments_space_fixer::FunctionArgumentsSpaceFixer;
 use crate::fixers::header_line_fixer::HeaderLineFixer;
+use crate::fixers::indent_fixer::IdentFixer;
 
 mod fixers;
 mod test_utilities;
@@ -21,7 +23,7 @@ const NEW_LINE: u8 = 10; // \n
 pub trait Fixer {
     fn query(&self) -> &str;
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<Option<Vec<u8>>>;
+    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)>;
 
     fn exec(&mut self, mut tree: Tree, parser: &mut Parser, source_code: &mut String, language: &Language) -> anyhow::Result<Tree> {
         let mut cursor = QueryCursor::new();
@@ -37,24 +39,27 @@ pub trait Fixer {
             let mut should_break = true;
 
             for mut node in nodes {
-                let tokens = self.fix(&node, source_code, &tree)?;
+                let (tokens, edit) = self.fix(&node, source_code, &tree)?;
 
                 if let Some(tokens) = tokens {
-                    if tokens != source_code[node.byte_range()].as_bytes() {
-                        if let Ok(tokens) = String::from_utf8(tokens) {
-                            source_code.replace_range(node.byte_range(), tokens.as_str());
+                    let edit = edit.unwrap_or(InputEdit {
+                        start_byte: node.start_byte(),
+                        start_position: node.start_position(),
+                        old_end_byte: node.end_byte(),
+                        old_end_position: node.end_position(),
+                        new_end_byte: node.start_byte() + tokens.len(),
+                        new_end_position: Point::new(
+                            node.start_position().row,
+                            node.start_position().column + tokens.len(),
+                        ),
+                    });
 
-                            tree.edit(&InputEdit {
-                                start_byte: node.start_byte(),
-                                start_position: node.start_position(),
-                                old_end_byte: node.end_byte(),
-                                old_end_position: node.end_position(),
-                                new_end_byte: node.start_byte() + tokens.len(),
-                                new_end_position: Point::new(
-                                    node.start_position().row,
-                                    node.start_position().column + tokens.len(),
-                                ),
-                            });
+                    if tokens != source_code[edit.start_byte..edit.new_end_byte].as_bytes() {
+                        if let Ok(tokens) = String::from_utf8(tokens) {
+
+                            source_code.replace_range(edit.start_byte..edit.new_end_byte, tokens.as_str());
+
+                            tree.edit(&edit);
 
                             tree = parser.parse(&source_code, Some(&tree)).expect("error re-parsing code.");
 
@@ -118,11 +123,13 @@ fn main() -> anyhow::Result<()> {
     let mut source_code = fs::read_to_string("src/Sample.php")?;
     let mut tree = parser.parse(&source_code, None).unwrap();
 
-    let fixers: [fn() -> Box<dyn Fixer>; 4] = [
-        || Box::new(ArrayBracketSpaceFixer {}),
-        || Box::new(DeclareDirectiveSpaceFixer {}),
-        || Box::new(DeclareDirectiveExistenceFixer {}),
-        || Box::new(HeaderLineFixer {}),
+    let fixers: [fn() -> Box<dyn Fixer>; 1] = [
+        // || Box::new(ArrayBracketSpaceFixer {}),
+        // || Box::new(DeclareDirectiveSpaceFixer {}),
+        // || Box::new(DeclareDirectiveExistenceFixer {}),
+        // || Box::new(FunctionArgumentsSpaceFixer {}),
+        || Box::new(IdentFixer {}),
+        // || Box::new(HeaderLineFixer {}),
     ];
 
     for fixer in fixers {

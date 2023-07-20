@@ -1,19 +1,37 @@
 <?php
+
 declare(strict_types = 1);
 
 namespace App\Console\Commands\Laravel;
 
+use App\Models\Client;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Telescope;
 use Illuminate\Filesystem\Filesystem;
-use stdClass;
-use Symfony\Component\Console\Command\Command as SymfonyCommand;
+use Illuminate\Support\Collection;
 use LastOne\Throwable;
 
-class EnvironmentEncryptCommand extends Filesystem
-{
-    public function handle(Throwable $throwable): int
+class EnvironmentEncryptCommand extends Filesystem {
+            use Something;
+    public function fetchForClient(Client $client): Collection
     {
-        $value = [1,2,3,new stdClass([1,2,3]),4];
+        return $this->queryBuilder()
+            ->where('client_id', $client->id)
+            ->with([
+'achievable.resort',
+            ])
+            ->latest()
+            ->get();
+    }
+
+     public function fetchForClient(Client $client): Collection
+    {
+        return $this->queryBuilder()
+            ->where('client_id', $client->id)
+            ->with([
+'achievable.resort',
+            ])
+            ->latest()
+            ->get();
     }
 }
