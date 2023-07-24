@@ -1,6 +1,7 @@
 use tree_sitter::{InputEdit, Node, Tree};
 
 use crate::Fixer;
+use crate::test_utilities::Edit;
 
 pub struct DeclareDirectiveExistenceFixer {}
 
@@ -11,17 +12,23 @@ impl Fixer for DeclareDirectiveExistenceFixer {
         "(php_tag) @tag"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
+    fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit> {
         let token = Vec::from("<?php declare(strict_types = 1);");
 
+        let edit = Edit {
+            deleted_length: node.end_byte() - node.start_byte(),
+            position: node.start_byte(),
+            inserted_text: token,
+        };
+
         match node.next_sibling() {
-            None => Ok((Some(token), None)),
+            None => Some(edit),
             Some(next_node) => {
                 if next_node.kind() != "declare_statement" {
-                    return Ok((Some(token), None));
+                    return Some(edit);
                 }
 
-                Ok((None, None))
+                None
             }
         }
     }
@@ -36,7 +43,7 @@ mod tests {
 
     pub fn assert_inputs(input: &str, output: &str) {
         assert_eq!(
-            run_fixer(input.to_string(), DeclareDirectiveExistenceFixer {}), output
+            run_fixer(input.into(), DeclareDirectiveExistenceFixer {}), output.as_bytes().to_vec()
         );
     }
 

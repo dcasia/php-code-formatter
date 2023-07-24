@@ -1,7 +1,7 @@
 use tree_sitter::{InputEdit, Node, Point, Tree};
 
 use crate::Fixer;
-use crate::test_utilities::{is_multiline, debug_node};
+use crate::test_utilities::{is_multiline, debug_node, Edit};
 
 pub struct IdentFixer {}
 
@@ -10,53 +10,50 @@ impl Fixer for IdentFixer {
         "(use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut String, tree: &Tree) -> anyhow::Result<(Option<Vec<u8>>, Option<InputEdit>)> {
-        if node.start_position().column == 4 {
-            return Ok((None, None));
+    fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit> {
+        let start_position = node.start_position();
+
+        // it is already indented
+        if start_position.column == 4 {
+            return None;
         }
 
         if node.start_position().column == 0 {
-            let mut tokens = source_code[node.byte_range()].as_bytes().to_vec();
+            let mut tokens = source_code[node.byte_range()].to_vec();
             let mut ident = b"    ".to_vec();
 
             ident.append(&mut tokens);
 
-            return Ok((Some(ident), None));
+            return Some(
+                Edit {
+                    deleted_length: node.end_byte() - node.start_byte(),
+                    position: node.start_byte(),
+                    inserted_text: ident,
+                }
+            )
         }
 
-        let current_node_start = node.start_position();
-        let previous_node_end = node.prev_sibling().unwrap().end_position();
+        let mut tokens = source_code[node.byte_range()].to_vec();
+        let previous_token = node.prev_sibling().unwrap();
 
-        // nodes start at different lines, then column can start from 0
-        if current_node_start.row != previous_node_end.row {
-            let start_byte = node.start_byte() - current_node_start.column;
-            let difference = node.start_byte() - start_byte;
-
-            println!("{:?}", &source_code[start_byte..node.end_byte()]);
-            println!("{:?}", &source_code[node.start_byte()..node.end_byte()]);
-            println!("{:?}", difference);
-
-            let mut tokens = source_code[node.byte_range()].as_bytes().to_vec();
-
-            let edit = InputEdit {
-                start_byte,
-                start_position: Point::new(node.start_position().row, 0),
-                old_end_byte: node.end_byte(),
-                old_end_position: node.end_position(),
-                new_end_byte: node.end_byte() -2,
-                new_end_position: Point::new(
-                    node.start_position().row,
-                    0 + tokens.len(),
-                ),
-            };
-
-            return Ok((Some(tokens), Some(edit)));
+        // If the token starts on the same row as the previous token
+        if previous_token.end_position().row == node.start_position().row {
+            return None;
         }
 
-        println!("{:?}", node.start_position());
-        println!("{:?}", node.prev_sibling().unwrap().end_position());
+        // pop the semicolon so there are difference between the previous token and the current one
+        tokens.pop();
 
-        Ok((None, None))
+        let newlines = 1;
+        let semicolon = 1;
+
+        Some(
+            Edit {
+                deleted_length: node.end_byte() - previous_token.end_byte() - newlines - semicolon,
+                position: previous_token.end_byte() + newlines,
+                inserted_text: tokens,
+            }
+        )
     }
 }
 
@@ -68,19 +65,18 @@ mod tests {
     use crate::test_utilities::run_fixer;
 
     pub fn assert_inputs(input: &str, output: &str) {
-        assert_eq!(
-            run_fixer(input.to_string(), IdentFixer {}), output
-        );
+        let left = String::from_utf8(run_fixer(input.into(), IdentFixer {})).unwrap();
+        let right = output.to_string();
+
+        assert_eq!(left, right);
     }
 
     #[test]
-    fn it_correctly_ident_use_traits_declaration() {
+    fn it_does_nothing_if_already_indented() {
         let input = indoc! {"
         <?php
         class Test {
-        use SomeTrait;
-            use SomeOtherTrait;
-                use SomeOtherSuperTrait;
+            use SomeTrait;
         }
         "};
 
@@ -88,8 +84,6 @@ mod tests {
         <?php
         class Test {
             use SomeTrait;
-            use SomeOtherTrait;
-            use SomeOtherSuperTrait;
         }
         "};
 
@@ -97,40 +91,80 @@ mod tests {
     }
 
     #[test]
-    fn it_add_space_within_nested_arrays() {
+    fn it_idents_if_not_indented() {
         let input = indoc! {"
         <?php
-        $value = [1,2,[a,b,c],3];
+        class Test {
+        use SomeTrait;
+        }
         "};
 
         let output = indoc! {"
         <?php
-        $value = [ 1, 2, [ a, b, c ], 3 ];
+        class Test {
+            use SomeTrait;
+        }
         "};
 
         assert_inputs(input, output);
     }
 
     #[test]
-    fn it_fix_array_that_contains_wierd_spaces_from_start() {
+    fn it_removes_idents_if_over_indented() {
         let input = indoc! {"
         <?php
-        $value = [    1,2  ,[a,  b, c
-        ], 3    ];
+        class Test {
+                use SomeTrait;
+        }
         "};
 
         let output = indoc! {"
         <?php
-        $value = [ 1, 2, [ a, b, c ], 3 ];
+        class Test {
+            use SomeTrait;
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+     #[test]
+    fn it_ignores_ident_if_defined_on_the_same_line_as_previous_token() {
+        let input = indoc! {"
+        <?php
+        class Test { use SomeTrait; }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test { use SomeTrait; }
         "};
 
         assert_inputs(input, output);
     }
 
     #[test]
-    fn it_does_not_add_spaces_within_blank_arrays() {
-        let input_output = indoc! {"<?php $value = [];"};
+    fn it_can_ident_chaotic_indentations() {
+        let input = indoc! {"
+        <?php
+        class Test {
+                use SomeTraitA;
+        use SomeTraitB;
+                            use SomeTraitC;
+            use SomeTraitD;
+        }
+        "};
 
-        assert_inputs(input_output, input_output);
+        let output = indoc! {"
+        <?php
+        class Test {
+            use SomeTraitA;
+            use SomeTraitB;
+            use SomeTraitC;
+            use SomeTraitD;
+        }
+        "};
+
+        assert_inputs(input, output);
     }
 }
