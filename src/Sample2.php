@@ -1,7 +1,7 @@
 <?php
-class Test {use SomeTraitA;
-    use SomeTraitB;
-
-    use SomeTraitC,SomeTraitDF;
-    use SomeTraitD;
+class Test {
+    function sample()
+                {
+        $a = 1;
+    }
 }
