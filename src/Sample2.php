@@ -2,12 +2,9 @@
 
 class Test
 {
-    function sample()
+    public function test2()
     {
-        $test =             function
-            ()
-            {
-$test = 1;
-};
+        $hey = function (){
+        };
     }
 }

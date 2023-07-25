@@ -1,5 +1,4 @@
 use anyhow::Context;
-use indoc::indoc;
 use tree_sitter::{Node, Tree};
 
 use crate::constants::{IDENT, IDENT_STR, LINE_BREAK, LINE_BREAK_STR};
@@ -9,8 +8,8 @@ use crate::test_utilities::Edit;
 pub struct IdentFixer {}
 
 impl IdentFixer {
-    fn ident_compound_statement(&self, node: &Node, parent: &Node, current_ident: &mut Vec<u8>, source_code: &mut Vec<u8>, current_level: usize) {
-        let inner_edit = self.ident(&node, source_code, current_level);
+    fn ident_compound_statement_node(&self, node: &Node, parent: &Node, current_ident: &mut Vec<u8>, source_code: &mut Vec<u8>, current_level: usize) {
+        let inner_edit = self.process(&node, source_code, current_level);
 
         let start_offset = node.start_byte() - parent.start_byte() + (IDENT.len() * current_level);
         let end_offset = start_offset + node.byte_range().count() - LINE_BREAK_STR.len();
@@ -18,7 +17,29 @@ impl IdentFixer {
         current_ident.splice(start_offset..=end_offset, inner_edit);
     }
 
-    fn ident(&self, node: &Node, source_code: &mut Vec<u8>, level: usize) -> Vec<u8> {
+    fn handle_switch_block<'a>(&self, node: Node<'a>) -> Option<Node<'a>> {
+        // todo
+        // maybe is better to crash the software to teach a lesson to the users who uses switch statement
+        Some(node)
+    }
+
+    fn handle_anonymous_function<'a>(&self, node: Node<'a>) -> Option<Node<'a>> {
+        node.child_by_field_name("right")
+            .filter(|node| node.kind() == "anonymous_function_creation_expression")
+            .map(|node| node.child_by_field_name("body"))
+            .unwrap_or(None)
+    }
+
+    fn handle_default<'a>(&self, node: Node<'a>) -> Option<Node<'a>> {
+        node.child_by_field_name("body")
+            .filter(|node| match node.kind() {
+                "compound_statement" => true,
+                "match_block" => true,
+                _ => false
+            })
+    }
+
+    fn process(&self, node: &Node, source_code: &mut Vec<u8>, level: usize) -> Vec<u8> {
         node.children(&mut node.walk())
             .map(|child| match child.kind() {
                 "{" => {
@@ -46,25 +67,14 @@ impl IdentFixer {
                     for inner_child in child.children(&mut child.walk()) {
                         let node: Option<Node> = match inner_child.kind() {
                             "compound_statement" => Some(inner_child),
-                            "assignment_expression" => {
-                                let response = inner_child.child_by_field_name("right").unwrap();
-
-                                println!("{:?}", response.map(|node| node.kind()));
-
-                                response
-                            },
-                            _ => inner_child
-                                .child_by_field_name("body")
-                                .filter(|node| match node.kind() {
-                                    "compound_statement" => true,
-                                    "match_block" => true,
-                                    _ => false
-                                })
+                            "switch_block" => self.handle_switch_block(inner_child),
+                            "assignment_expression" => self.handle_anonymous_function(inner_child),
+                            _ => self.handle_default(inner_child),
                         };
 
                         if let Some(inner_child) = node {
-                            self.ident_compound_statement(
-                                &inner_child, &child, &mut ident, source_code, current_level
+                            self.ident_compound_statement_node(
+                                &inner_child, &child, &mut ident, source_code, current_level,
                             );
                         }
                     }
@@ -79,11 +89,7 @@ impl IdentFixer {
 
 impl Fixer for IdentFixer {
     fn query(&self) -> &str {
-        indoc! {"
-            (class_declaration body: (declaration_list) @brackets)
-        "}
-        //(function_definition body: (compound_statement) @function-brackets)
-        //(class_declaration body: (declaration_list (method_declaration body: (compound_statement) @brackets)))
+        "(class_declaration body: (declaration_list) @brackets)"
     }
 
     fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit> {
@@ -91,7 +97,7 @@ impl Fixer for IdentFixer {
             Edit {
                 deleted_length: node.end_byte() - node.start_byte(),
                 position: node.start_byte(),
-                inserted_text: self.ident(&node, source_code, 0),
+                inserted_text: self.process(&node, source_code, 0),
             }
         )
     }
@@ -402,6 +408,29 @@ mod tests {
                         $c = 3;
                     }
                 }
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_does_not_destroy_lambda_functions() {
+        let input = indoc! {"
+        <?php
+        class Test {
+        function sample() {
+        $example = fn () => true;
+        }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test {
+            function sample() {
+                $example = fn () => true;
             }
         }
         "};

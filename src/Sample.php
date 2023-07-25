@@ -2,10 +2,10 @@
 
 class Test
 {
-function sample()
-{
-$test = function () {
-$test = 1;
+    public function test2()
+    {
+$hey = function (){
+
 };
-}
+    }
 }
