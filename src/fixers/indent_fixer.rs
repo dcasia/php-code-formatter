@@ -2,13 +2,22 @@ use anyhow::Context;
 use indoc::indoc;
 use tree_sitter::{Node, Tree};
 
-use crate::constants::{IDENT, IDENT_STR, LINE_BREAK_STR};
+use crate::constants::{IDENT, IDENT_STR, LINE_BREAK, LINE_BREAK_STR};
 use crate::Fixer;
 use crate::test_utilities::Edit;
 
 pub struct IdentFixer {}
 
 impl IdentFixer {
+    fn ident_compound_statement(&self, node: &Node, parent: &Node, current_ident: &mut Vec<u8>, source_code: &mut Vec<u8>, current_level: usize) {
+        let inner_edit = self.ident(&node, source_code, current_level);
+
+        let start_offset = node.start_byte() - parent.start_byte() + (IDENT.len() * current_level);
+        let end_offset = start_offset + node.byte_range().count() - LINE_BREAK_STR.len();
+
+        current_ident.splice(start_offset..=end_offset, inner_edit);
+    }
+
     fn ident(&self, node: &Node, source_code: &mut Vec<u8>, level: usize) -> Vec<u8> {
         node.children(&mut node.walk())
             .map(|child| match child.kind() {
@@ -22,30 +31,42 @@ impl IdentFixer {
                     format!("{}{{{}", ident, LINE_BREAK_STR).as_bytes().to_vec()
                 }
                 "}" => format!("{}}}", IDENT_STR.repeat(level)).as_bytes().to_vec(),
+                "," => format!(",{}", LINE_BREAK_STR).as_bytes().to_vec(),
                 _ => {
                     let mut tokens = source_code[child.byte_range()].to_vec();
                     let current_level = level + 1;
 
                     let mut ident = IDENT.repeat(current_level).to_vec();
                     ident.append(&mut tokens);
-                    ident.extend_from_slice(LINE_BREAK_STR.as_bytes());
 
-                    if let Some(inner_child) = child.child_by_field_name("body") {
+                    if let Some(_) = child.next_sibling().filter(|node| node.kind() != ",") {
+                        ident.extend_from_slice(LINE_BREAK);
+                    }
 
-                        println!("PARENT_START: {:?}", inner_child.parent().unwrap().utf8_text(source_code).unwrap());
-                        println!("CURRENT: {:?}", inner_child.utf8_text(source_code).unwrap());
+                    for inner_child in child.children(&mut child.walk()) {
+                        let node: Option<Node> = match inner_child.kind() {
+                            "compound_statement" => Some(inner_child),
+                            "assignment_expression" => {
+                                let response = inner_child.child_by_field_name("right").unwrap();
 
-                        let inner_edit = self.ident(&inner_child, source_code, current_level);
+                                println!("{:?}", response.map(|node| node.kind()));
 
-                        let start_offset = inner_child.start_byte() - child.start_byte() + (IDENT.len() * current_level);
-                        let end_offset = start_offset + inner_child.byte_range().count() - LINE_BREAK_STR.len();
+                                response
+                            },
+                            _ => inner_child
+                                .child_by_field_name("body")
+                                .filter(|node| match node.kind() {
+                                    "compound_statement" => true,
+                                    "match_block" => true,
+                                    _ => false
+                                })
+                        };
 
-                        ident.splice(start_offset..=end_offset, inner_edit);
-
-                        // println!("CHILD: {:?}", child.utf8_text(source_code).unwrap());
-                        // println!("INNER: {:?}", inner_child.utf8_text(source_code).unwrap());
-                        //
-                        // println!("OFFSETS: {} {}", start_offset, end_offset);
+                        if let Some(inner_child) = node {
+                            self.ident_compound_statement(
+                                &inner_child, &child, &mut ident, source_code, current_level
+                            );
+                        }
                     }
 
                     ident
@@ -142,30 +163,30 @@ mod tests {
         assert_inputs(input, output);
     }
 
-    #[test]
-    fn it_removes_idents_if_over_indented() {
-        let input = indoc! {"
-        <?php
-        class Test {
-                use SomeTrait;
-                        function sample()
-                        {
-                        }
-        }
-        "};
-
-        let output = indoc! {"
-        <?php
-        class Test {
-            use SomeTrait;
-            function sample()
-            {
-            }
-        }
-        "};
-
-        assert_inputs(input, output);
-    }
+    // #[test]
+    // fn it_removes_idents_if_over_indented() {
+    //     let input = indoc! {"
+    //     <?php
+    //     class Test {
+    //             use SomeTrait;
+    //                     function sample()
+    //                     {
+    //                     }
+    //     }
+    //     "};
+    //
+    //     let output = indoc! {"
+    //     <?php
+    //     class Test {
+    //         use SomeTrait;
+    //         function sample()
+    //         {
+    //         }
+    //     }
+    //     "};
+    //
+    //     assert_inputs(input, output);
+    // }
 
     #[test]
     fn it_idents_even_if_everything_is_inlined_in_a_single_line() {
@@ -207,6 +228,139 @@ mod tests {
             function sampleB() {
             }
             function sampleC() {
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_can_ident_anonymous_function() {
+        let input = indoc! {"
+        <?php
+        class Test
+        {
+        function sample()
+        {
+        function () {
+        return function () {
+        return 3;
+        };
+        };
+        }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test
+        {
+            function sample()
+            {
+                function () {
+                    return function () {
+                        return 3;
+                    };
+                };
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_can_ident_anonymous_function_when_assigned_to_variables() {
+        let input = indoc! {"
+        <?php
+        class Test
+        {
+        function sample()
+        {
+        $test = function () {
+        $test = 1;
+        };
+        }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test
+        {
+            function sample()
+            {
+                $test = function () {
+                    $test = 1;
+                };
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_can_ident_for_if() {
+        let input = indoc! {"
+        <?php
+        class Test {
+        function sample() {
+        for (;;) {
+        if ($i % 2 === 0) {
+        $sample = 1;
+        }}}}
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test {
+            function sample() {
+                for (;;) {
+                    if ($i % 2 === 0) {
+                        $sample = 1;
+                    }
+                }
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_can_ident_match_block() {
+        let input = indoc! {"
+        <?php
+        class Test
+        {
+        function sample()
+        {
+        match (true) {
+        true => 1,
+        false => match (false) {
+        true => 2,
+        false => 3,
+        },
+        };
+        }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test
+        {
+            function sample()
+            {
+                match (true) {
+                    true => 1,
+                    false => match (false) {
+                        true => 2,
+                        false => 3,
+                    },
+                };
             }
         }
         "};

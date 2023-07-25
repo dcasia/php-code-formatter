@@ -48,7 +48,7 @@ pub trait Fixer {
 
                         tree = parser.parse(&source_code, Some(&tree)).expect("error re-parsing code.");
 
-                        should_break = false;
+                        should_break = true;
 
                         break;
                     }

@@ -1,7 +1,13 @@
 <?php
-class Test {
+
+class Test
+{
     function sample()
-                {
-        $a = 1;
+    {
+        $test =             function
+            ()
+            {
+$test = 1;
+};
     }
 }
