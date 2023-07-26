@@ -1,4 +1,5 @@
-use std::cmp::{max, min};
+use std::ops::Sub;
+
 use anyhow::Context;
 use tree_sitter::{Node, Tree};
 
@@ -9,45 +10,51 @@ use crate::test_utilities::Edit;
 pub struct IdentFixer {}
 
 impl IdentFixer {
-    fn ident_compound_statement_node(&self, node: &Node, parent: &Node, current_ident: &mut Vec<u8>, source_code: &mut Vec<u8>, current_level: usize) {
-        let mut inner_edit = self.process(&node, source_code, current_level);
-        let previous_node = node.prev_sibling();
+    fn ident_compound_statement_node(
+        &self,
+        node: &Node,
+        parent: &Node,
+        current_ident: &mut Vec<u8>,
+        source_code: &mut Vec<u8>,
+        level: usize,
+    )
+    {
+        let ident_size = IDENT.len();
+        let line_break_size = LINE_BREAK.len();
+        let node_start_byte = node.start_byte();
 
+        let mut inner_edit = self.process(&node, source_code, level);
+        let mut ident_level = ident_size * level;
         let mut sub_ident_by = 0;
-        let mut ident_level = IDENT.len() * current_level;
 
-        if let Some(previous_node) = previous_node {
+        if let Some(previous_node) = node.prev_sibling() {
+            //--------------------------------------------------------------------------------------
+            let previous_node_end_byte = previous_node.end_byte();
+            let difference = node_start_byte - previous_node_end_byte;
+            let is_over_indented = node_start_byte > previous_node_end_byte + ident_level;
 
-             let difference = node.start_byte() - previous_node.end_byte();
-
-            // When it is over indented
-            if node.start_byte() > previous_node.end_byte() + ident_level {
-                sub_ident_by = difference - ident_level - LINE_BREAK.len();
+            if is_over_indented == true {
+                sub_ident_by = difference - ident_level - line_break_size;
             }
 
-            println!("{} {}", difference, 4 - 1 - difference);
-            let mut ident = b".".repeat(4 - 1 - difference).to_vec();
-            ident.append(&mut inner_edit);
+            if is_over_indented == false {
+                //----------------------------------------------------------------------------------
+                let repeat_by = (ident_level + line_break_size)
+                    .checked_sub(difference)
+                    .unwrap_or(0);
 
-            inner_edit = ident;
+                let mut ident = b" ".repeat(repeat_by % ident_level);
 
-            // println!("{} {} {}", node.start_byte(), previous_node.end_byte(), ident_level);
+                ident.append(&mut inner_edit);
+
+                inner_edit = ident;
+                //----------------------------------------------------------------------------------
+            }
+            //--------------------------------------------------------------------------------------
         }
 
-        //    function sample()\n   {\n\n    }
-        //                          {\n\n    }
-        //....function sample()\n   {\n\n    }\n
-        //                          {\n    }
-
-        println!("{:?}", node.utf8_text(source_code).unwrap());
-        println!("{:?}", parent.utf8_text(source_code).unwrap());
-        println!("{:?}", String::from_utf8(current_ident.to_vec()).unwrap());
-        println!("{:?}", String::from_utf8(inner_edit.to_vec()).unwrap());
-
-        let start_offset = node.start_byte() - parent.start_byte() + ident_level;
-        let end_offset = start_offset + node.byte_range().count() - LINE_BREAK.len();
-
-        println!("{}:{}", start_offset, end_offset);
+        let start_offset = node_start_byte - parent.start_byte() + ident_level - sub_ident_by;
+        let end_offset = start_offset + node.byte_range().count() - line_break_size + sub_ident_by;
 
         current_ident.splice(start_offset..=end_offset, inner_edit);
     }
@@ -78,6 +85,7 @@ impl IdentFixer {
         node.children(&mut node.walk())
             .map(|child| match child.kind() {
                 "{" => {
+                    //------------------------------------------------------------------------------
                     let mut ident = IDENT_STR.repeat(level);
 
                     if child.start_position().column != 0 {
@@ -85,10 +93,12 @@ impl IdentFixer {
                     }
 
                     format!("{}{{{}", ident, LINE_BREAK_STR).as_bytes().to_vec()
+                    //------------------------------------------------------------------------------
                 }
                 "}" => format!("{}}}", IDENT_STR.repeat(level)).as_bytes().to_vec(),
                 "," => format!(",{}", LINE_BREAK_STR).as_bytes().to_vec(),
                 _ => {
+                    //------------------------------------------------------------------------------
                     let mut tokens = source_code[child.byte_range()].to_vec();
                     let current_level = level + 1;
 
@@ -100,6 +110,7 @@ impl IdentFixer {
                     }
 
                     for inner_child in child.children(&mut child.walk()) {
+                        //--------------------------------------------------------------------------
                         let node: Option<Node> = match inner_child.kind() {
                             "compound_statement" => Some(inner_child),
                             "switch_block" => self.handle_switch_block(inner_child),
@@ -108,13 +119,17 @@ impl IdentFixer {
                         };
 
                         if let Some(inner_child) = node {
+                            //----------------------------------------------------------------------
                             self.ident_compound_statement_node(
                                 &inner_child, &child, &mut ident, source_code, current_level,
                             );
+                            //----------------------------------------------------------------------
                         }
+                        //--------------------------------------------------------------------------
                     }
 
                     ident
+                    //------------------------------------------------------------------------------
                 }
             })
             .flat_map(|token| token.to_owned())
@@ -311,7 +326,7 @@ mod tests {
             {
                 function sample2()
                 {
-                    function sample()
+                    function sample3()
                     {
                     }
                 }
