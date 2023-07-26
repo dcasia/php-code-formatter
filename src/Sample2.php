@@ -3,6 +3,6 @@
 class Test
 {
     function sample()
-   {
-    }}
+..    {
+    }
 }

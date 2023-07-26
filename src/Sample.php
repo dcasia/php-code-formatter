@@ -3,7 +3,7 @@
 class Test
 {
     function sample()
-   {
+{
 
     }
 }

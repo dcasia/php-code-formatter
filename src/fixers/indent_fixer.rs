@@ -10,7 +10,7 @@ pub struct IdentFixer {}
 
 impl IdentFixer {
     fn ident_compound_statement_node(&self, node: &Node, parent: &Node, current_ident: &mut Vec<u8>, source_code: &mut Vec<u8>, current_level: usize) {
-        let inner_edit = self.process(&node, source_code, current_level);
+        let mut inner_edit = self.process(&node, source_code, current_level);
         let previous_node = node.prev_sibling();
 
         let mut sub_ident_by = 0;
@@ -18,19 +18,36 @@ impl IdentFixer {
 
         if let Some(previous_node) = previous_node {
 
+             let difference = node.start_byte() - previous_node.end_byte();
+
             // When it is over indented
             if node.start_byte() > previous_node.end_byte() + ident_level {
-                let difference = node.start_byte() - previous_node.end_byte();
                 sub_ident_by = difference - ident_level - LINE_BREAK.len();
-
             }
 
+            println!("{} {}", difference, 4 - 1 - difference);
+            let mut ident = b".".repeat(4 - 1 - difference).to_vec();
+            ident.append(&mut inner_edit);
+
+            inner_edit = ident;
 
             // println!("{} {} {}", node.start_byte(), previous_node.end_byte(), ident_level);
         }
 
-        let start_offset = node.start_byte() - parent.start_byte() + ident_level - sub_ident_by;
-        let end_offset = start_offset + node.byte_range().count() - LINE_BREAK.len() + sub_ident_by;
+        //    function sample()\n   {\n\n    }
+        //                          {\n\n    }
+        //....function sample()\n   {\n\n    }\n
+        //                          {\n    }
+
+        println!("{:?}", node.utf8_text(source_code).unwrap());
+        println!("{:?}", parent.utf8_text(source_code).unwrap());
+        println!("{:?}", String::from_utf8(current_ident.to_vec()).unwrap());
+        println!("{:?}", String::from_utf8(inner_edit.to_vec()).unwrap());
+
+        let start_offset = node.start_byte() - parent.start_byte() + ident_level;
+        let end_offset = start_offset + node.byte_range().count() - LINE_BREAK.len();
+
+        println!("{}:{}", start_offset, end_offset);
 
         current_ident.splice(start_offset..=end_offset, inner_edit);
     }
