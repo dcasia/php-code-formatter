@@ -26,7 +26,7 @@ pub const LINE_BREAK: &[u8; 2] = b"\r\n";
 pub trait Fixer {
     fn query(&self) -> &str;
 
-    fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit>;
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit>;
 
     fn exec(&mut self, mut tree: Tree, parser: &mut Parser, source_code: &mut Vec<u8>, language: &Language) -> anyhow::Result<Tree> {
         let mut cursor = QueryCursor::new();

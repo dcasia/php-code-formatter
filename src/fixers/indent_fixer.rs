@@ -15,7 +15,7 @@ impl IdentFixer {
         node: &Node,
         parent: &Node,
         current_ident: &mut Vec<u8>,
-        source_code: &mut Vec<u8>,
+        source_code: &Vec<u8>,
         level: usize,
     )
     {
@@ -81,7 +81,7 @@ impl IdentFixer {
             })
     }
 
-    fn process(&self, node: &Node, source_code: &mut Vec<u8>, level: usize) -> Vec<u8> {
+    fn process(&self, node: &Node, source_code: &Vec<u8>, level: usize) -> Vec<u8> {
         node.children(&mut node.walk())
             .map(|child| match child.kind() {
                 "{" => {
@@ -142,7 +142,7 @@ impl Fixer for IdentFixer {
         "(class_declaration body: (declaration_list) @brackets)"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit> {
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit> {
         Some(
             Edit {
                 deleted_length: node.end_byte() - node.start_byte(),

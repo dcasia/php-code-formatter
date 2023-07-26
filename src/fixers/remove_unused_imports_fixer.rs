@@ -11,7 +11,7 @@ impl Fixer for RemoveUnusedImportsFixer {
         "(namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit> {
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit> {
         // Collect all static method calls Class::method()
         todo!();
         // let query = Query::new(node.language(), indoc! {"

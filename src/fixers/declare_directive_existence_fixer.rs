@@ -12,7 +12,7 @@ impl Fixer for DeclareDirectiveExistenceFixer {
         "(php_tag) @tag"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &mut Vec<u8>, tree: &Tree) -> Option<Edit> {
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit> {
         let token = Vec::from("<?php declare(strict_types = 1);");
 
         let edit = Edit {
