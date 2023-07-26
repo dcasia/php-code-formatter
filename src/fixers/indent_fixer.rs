@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use anyhow::Context;
 use tree_sitter::{Node, Tree};
 
@@ -10,9 +11,26 @@ pub struct IdentFixer {}
 impl IdentFixer {
     fn ident_compound_statement_node(&self, node: &Node, parent: &Node, current_ident: &mut Vec<u8>, source_code: &mut Vec<u8>, current_level: usize) {
         let inner_edit = self.process(&node, source_code, current_level);
+        let previous_node = node.prev_sibling();
 
-        let start_offset = node.start_byte() - parent.start_byte() + (IDENT.len() * current_level);
-        let end_offset = start_offset + node.byte_range().count() - LINE_BREAK_STR.len();
+        let mut sub_ident_by = 0;
+        let mut ident_level = IDENT.len() * current_level;
+
+        if let Some(previous_node) = previous_node {
+
+            // When it is over indented
+            if node.start_byte() > previous_node.end_byte() + ident_level {
+                let difference = node.start_byte() - previous_node.end_byte();
+                sub_ident_by = difference - ident_level - LINE_BREAK.len();
+
+            }
+
+
+            // println!("{} {} {}", node.start_byte(), previous_node.end_byte(), ident_level);
+        }
+
+        let start_offset = node.start_byte() - parent.start_byte() + ident_level - sub_ident_by;
+        let end_offset = start_offset + node.byte_range().count() - LINE_BREAK.len() + sub_ident_by;
 
         current_ident.splice(start_offset..=end_offset, inner_edit);
     }
@@ -169,30 +187,123 @@ mod tests {
         assert_inputs(input, output);
     }
 
-    // #[test]
-    // fn it_removes_idents_if_over_indented() {
-    //     let input = indoc! {"
-    //     <?php
-    //     class Test {
-    //             use SomeTrait;
-    //                     function sample()
-    //                     {
-    //                     }
-    //     }
-    //     "};
-    //
-    //     let output = indoc! {"
-    //     <?php
-    //     class Test {
-    //         use SomeTrait;
-    //         function sample()
-    //         {
-    //         }
-    //     }
-    //     "};
-    //
-    //     assert_inputs(input, output);
-    // }
+    #[test]
+    fn it_removes_idents_when_it_is_over_indented() {
+        let input = indoc! {"
+        <?php
+        class Test {
+                function sample1()
+                        {
+                        function sample2()
+                                    {
+                                                  }
+                  }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test {
+            function sample1()
+            {
+                function sample2()
+                {
+                }
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_adds_idents_when_it_is_under_indented() {
+        let input = indoc! {"
+        <?php
+        class Test {
+                       function sample1()
+            {
+                                 function sample2()
+                 {
+                    }
+                      }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test {
+            function sample1()
+            {
+                function sample2()
+                {
+                }
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_adds_idents_when_it_is_under_indented_by_1() {
+        let input = indoc! {"
+        <?php
+        class Test {
+            function sample()
+           {
+            }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test {
+            function sample()
+            {
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_fix_idents_when_it_is_crazy_indented() {
+        let input = indoc! {"
+        <?php
+        class Test {
+                use SomeTrait;
+                        function sample()
+                   {
+        function sample2()
+               {
+                                                function sample3()
+                   {
+                                                                  }
+                                                    }
+            }
+        }
+        "};
+
+        let output = indoc! {"
+        <?php
+        class Test {
+            use SomeTrait;
+            function sample()
+            {
+                function sample2()
+                {
+                    function sample()
+                    {
+                    }
+                }
+            }
+        }
+        "};
+
+        assert_inputs(input, output);
+    }
 
     #[test]
     fn it_idents_even_if_everything_is_inlined_in_a_single_line() {
