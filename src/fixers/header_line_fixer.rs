@@ -7,54 +7,63 @@ use crate::test_utilities::Edit;
 pub struct HeaderLineFixer {}
 
 impl HeaderLineFixer {
-    fn handle(&self, source_code: &Vec<u8>, current_node: &Node, next_node: &Node) -> Option<Vec<u8>> {
-        let mut tokens = source_code[current_node.byte_range()].to_vec();
-
-        let current_node_row = current_node.start_position().row;
-        let next_node_row = next_node.start_position().row;
-
-        let is_same_line = current_node_row == next_node_row;
-        let is_distinct = current_node.kind() != next_node.kind();
-
-        println!("{:?}", current_node.utf8_text(source_code).unwrap());
+    fn handle_ungrouped(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        let mut tokens = source_code[node.byte_range()].to_vec();
 
         tokens.extend_from_slice(LINE_BREAK);
 
-        if is_distinct && is_same_line {
+        if node.next_named_sibling().is_some() {
             tokens.extend_from_slice(LINE_BREAK);
         }
 
-        if is_same_line {
-            return Some(tokens);
+        tokens
+    }
+
+    fn handle_grouped(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        let mut tokens = source_code[node.byte_range()].to_vec();
+
+        tokens.extend_from_slice(LINE_BREAK);
+
+        // If the next node is different from the current one, we add an extra line break
+        if node.next_named_sibling().filter(|next_node| next_node.kind() != node.kind()).is_some() {
+            tokens.extend_from_slice(LINE_BREAK);
         }
 
-        if current_node_row + 1 == next_node_row && is_distinct {
-            return Some(tokens);
-        }
+        println!("{:?}", node.utf8_text(source_code).unwrap());
 
-        return None;
+        tokens
+    }
+
+    fn process(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        node.children(&mut node.walk())
+            .map(|child| match child.kind() {
+                "php_tag" |
+                "declare_statement" |
+                "namespace_definition" |
+                "function_definition" |
+                "class_declaration" => self.handle_ungrouped(&child, source_code),
+                "namespace_use_declaration" |
+                "expression_statement" => self.handle_grouped(&child, source_code),
+                _ => source_code[child.byte_range()].to_vec()
+            })
+            .flat_map(|token| token.to_owned())
+            .collect()
     }
 }
 
 impl Fixer for HeaderLineFixer {
     fn query(&self) -> &str {
-        "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration) @use"
+        "(program) @program"
     }
 
     fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
-        if let Some(next_node) = node.next_named_sibling() {
-            if let Some(text) = self.handle(source_code, node, &next_node) {
-                return Some(
-                    Edit {
-                        deleted_length: node.end_byte() - node.start_byte(),
-                        position: node.start_byte(),
-                        inserted_text: text,
-                    }
-                );
+        Some(
+            Edit {
+                deleted_length: node.end_byte() - node.start_byte(),
+                position: node.start_byte(),
+                inserted_text: self.process(&node, source_code),
             }
-        }
-
-        None
+        )
     }
 }
 
@@ -121,6 +130,18 @@ mod tests {
     }
 
     #[test]
+    fn it_removes_leading_spaces_from_opening_php_tag() {
+        let input = indoc! {"
+            <?php
+        "};
+        let output = indoc! {"
+        <?php
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
     fn it_works_with_when_using_alias() {
         let input = indoc! {"
         <?phpuse App\\One as Um;use App\\Two as Dois;
@@ -145,8 +166,32 @@ mod tests {
         let output = indoc! {"
         <?php
 
-        use App\\One as Um;
-        use App\\Two as Dois;
+        use App\\One;
+        use App\\Two;
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn it_separates_functions_and_expressions() {
+        let input = indoc! {"
+        <?php
+        function a() {}
+        function b() {}
+        $a = 123;
+        $b = 123;
+        "};
+
+        let output = indoc! {"
+        <?php
+
+        function a() {}
+
+        function b() {}
+
+        $a = 123;
+        $b = 123;
         "};
 
         assert_inputs(input, output);

@@ -1,3 +1,6 @@
-<?php use App\One;                               use App\Two;
+<?php
 
-class Test {}
+function sample() {}
+function sample2() {}
+$example = 123;
+$example2 = 123;

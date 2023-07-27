@@ -143,7 +143,6 @@ impl Fixer for IndentBracketBodyFixer {
     }
 
     fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
-        println!("{:?}", node.utf8_text(source_code).unwrap());
         Some(
             Edit {
                 deleted_length: node.end_byte() - node.start_byte(),
