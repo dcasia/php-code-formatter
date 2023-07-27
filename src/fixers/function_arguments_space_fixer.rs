@@ -34,13 +34,13 @@ impl Fixer for FunctionArgumentsSpaceFixer {
 mod tests {
     use indoc::indoc;
 
+    use crate::fixer::FixerTestRunner;
     use crate::fixers::function_arguments_space_fixer::FunctionArgumentsSpaceFixer;
-    use crate::test_utilities::run_fixer;
 
-    pub fn assert_inputs(input: &str, output: &str) {
-        assert_eq!(
-            run_fixer(input.to_string().into(), FunctionArgumentsSpaceFixer {}), output.as_bytes().to_vec()
-        );
+    pub fn assert_inputs(input: &'static str, output: &'static str) {
+        let mut runner = FixerTestRunner::new(input, output);
+        runner.with_fixer(Box::new(FunctionArgumentsSpaceFixer {}));
+        runner.assert();
     }
 
     #[test]

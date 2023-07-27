@@ -46,13 +46,13 @@ impl Fixer for ArrayBracketSpaceFixer {
 mod tests {
     use indoc::indoc;
 
+    use crate::fixer::FixerTestRunner;
     use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
-    use crate::test_utilities::run_fixer;
 
-    pub fn assert_inputs(input: &str, output: &str) {
-        assert_eq!(
-            run_fixer(input.into(), ArrayBracketSpaceFixer {}), output.as_bytes().to_vec()
-        );
+    pub fn assert_inputs(input: &'static str, output: &'static str) {
+        let mut runner = FixerTestRunner::new(input, output);
+        runner.with_fixer(Box::new(ArrayBracketSpaceFixer {}));
+        runner.assert();
     }
 
     #[test]

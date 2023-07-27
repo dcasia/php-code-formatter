@@ -38,13 +38,13 @@ impl Fixer for DeclareDirectiveExistenceFixer {
 mod tests {
     use indoc::indoc;
 
+    use crate::fixer::FixerTestRunner;
     use crate::fixers::declare_directive_existence_fixer::DeclareDirectiveExistenceFixer;
-    use crate::test_utilities::run_fixer;
 
-    pub fn assert_inputs(input: &str, output: &str) {
-        assert_eq!(
-            run_fixer(input.into(), DeclareDirectiveExistenceFixer {}), output.as_bytes().to_vec()
-        );
+    pub fn assert_inputs(input: &'static str, output: &'static str) {
+        let mut runner = FixerTestRunner::new(input, output);
+        runner.with_fixer(Box::new(DeclareDirectiveExistenceFixer {}));
+        runner.assert();
     }
 
     #[test]

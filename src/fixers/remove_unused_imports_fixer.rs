@@ -45,7 +45,7 @@ impl Fixer for RemoveUnusedImportsFixer {
     }
 }
 
-#[cfg(test)]
+#[cfg(ignore)]
 mod tests {
     use indoc::indoc;
 

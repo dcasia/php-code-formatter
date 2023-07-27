@@ -4,6 +4,7 @@
 use std::fs;
 
 use crate::fixer::{Fixer, FixerRunner};
+use crate::fixers::header_line_fixer::HeaderLineFixer;
 use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
 
 mod fixers;
@@ -19,8 +20,8 @@ fn main() -> anyhow::Result<()> {
         //|| Box::new(DeclareDirectiveSpaceFixer {}),
         //|| Box::new(DeclareDirectiveExistenceFixer {}),
         //|| Box::new(FunctionArgumentsSpaceFixer {}),
-        || Box::new(IndentBracketBodyFixer {}),
-        //|| Box::new(HeaderLineFixer {}),
+        //|| Box::new(IndentBracketBodyFixer {}),
+        || Box::new(HeaderLineFixer {}),
     ];
 
     fixers.iter().for_each(|fixer| runner.add_fixer(fixer()));

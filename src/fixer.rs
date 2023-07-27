@@ -59,7 +59,8 @@ impl FixerRunner {
 
         parser.set_language(language)?;
 
-        let mut tree = parser.parse(&source_code, None).unwrap();
+        let mut tree = parser.parse(&source_code, None)
+            .ok_or(anyhow::Error::msg("Failed to parse source code."))?;
 
         for fixer in &mut self.fixers {
             tree = fixer.execute(tree, &mut parser, source_code, &language)?;
@@ -71,49 +72,32 @@ impl FixerRunner {
 
 pub struct FixerTestRunner {
     fixers: Vec<Box<dyn Fixer>>,
-    input: Option<Vec<u8>>,
-    output: Option<Vec<u8>>,
+    input: Vec<u8>,
+    output: Vec<u8>,
 }
 
 impl FixerTestRunner {
-    pub fn new() -> Self {
+    pub fn new(input: &'static str, output: &'static str) -> Self {
         Self {
             fixers: vec![],
-            input: None,
-            output: None,
+            input: input.as_bytes().to_vec(),
+            output: output.as_bytes().to_vec(),
         }
     }
 
-    pub fn with_fixer(&mut self, fixer: Box<dyn Fixer>) -> &mut Self {
+    pub fn with_fixer(&mut self, fixer: Box<dyn Fixer>) {
         self.fixers.push(fixer);
-
-        self
     }
 
-    pub fn with_input(&mut self, input: &'static str) -> &mut Self {
-        self.input = Some(input.as_bytes().to_vec());
-
-        self
-    }
-
-    pub fn with_expected_output(&mut self, output: &'static str) -> &mut Self {
-        self.output = Some(output.as_bytes().to_vec());
-
-        self
-    }
-
-    pub fn assert(self) {
+    pub fn assert(mut self) {
         let mut runner = FixerRunner {
             fixers: self.fixers
         };
 
-        let mut input = self.input.expect("Input is required, please call .with_input() method.");
-        let expected_output = self.output.expect("Output is required, please call .with_expected_output() method.");
+        runner.execute(&mut self.input).expect("Failed to execute fixers.");
 
-        runner.execute(&mut input).expect("Failed to execute fixers.");
-
-        let left = String::from_utf8(input).expect("Failed to convert input to string.");
-        let right = String::from_utf8(expected_output).expect("Failed to convert output to string.");
+        let left = String::from_utf8(self.input).expect("Failed to convert input to string.");
+        let right = String::from_utf8(self.output).expect("Failed to convert output to string.");
 
         assert_eq!(left, right);
     }

@@ -143,6 +143,7 @@ impl Fixer for IndentBracketBodyFixer {
     }
 
     fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
+        println!("{:?}", node.utf8_text(source_code).unwrap());
         Some(
             Edit {
                 deleted_length: node.end_byte() - node.start_byte(),
@@ -161,11 +162,8 @@ mod tests {
     use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
 
     pub fn assert_inputs(input: &'static str, output: &'static str) {
-        let mut runner = FixerTestRunner::new();
-
+        let mut runner = FixerTestRunner::new(input, output);
         runner.with_fixer(Box::new(IndentBracketBodyFixer {}));
-        runner.with_input(input);
-        runner.with_expected_output(output);
         runner.assert();
     }
 
