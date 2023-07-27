@@ -4,7 +4,7 @@ use anyhow::Context;
 use tree_sitter::{Node, Tree};
 
 use crate::constants::{IDENT, IDENT_STR, LINE_BREAK, LINE_BREAK_STR};
-use crate::Fixer;
+use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
 pub struct IndentBracketBodyFixer {}

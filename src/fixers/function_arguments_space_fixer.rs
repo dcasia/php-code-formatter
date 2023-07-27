@@ -1,6 +1,6 @@
-use tree_sitter::{InputEdit, Node, Tree};
+use tree_sitter::Node;
 
-use crate::Fixer;
+use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
 pub struct FunctionArgumentsSpaceFixer {}
@@ -34,7 +34,6 @@ impl Fixer for FunctionArgumentsSpaceFixer {
 mod tests {
     use indoc::indoc;
 
-    use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
     use crate::fixers::function_arguments_space_fixer::FunctionArgumentsSpaceFixer;
     use crate::test_utilities::run_fixer;
 

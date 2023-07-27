@@ -1,6 +1,6 @@
-use tree_sitter::{InputEdit, Node, Tree};
+use tree_sitter::Node;
 
-use crate::Fixer;
+use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
 pub struct DeclareDirectiveExistenceFixer {}

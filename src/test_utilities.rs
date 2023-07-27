@@ -1,5 +1,7 @@
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
-use crate::{Fixer, tree_sitter_php};
+
+use crate::tree_sitter_php;
+use crate::fixer::Fixer;
 
 #[derive(Debug)]
 pub struct Edit {
@@ -26,7 +28,7 @@ pub fn run_fixer(mut source_code: Vec<u8>, mut fixer: impl Fixer) -> Vec<u8> {
 
     let mut tree = parser.parse(&source_code, None).unwrap();
 
-    fixer.exec(tree, &mut parser, &mut source_code, &language);
+    fixer.execute(tree, &mut parser, &mut source_code, &language);
 
     source_code
 }

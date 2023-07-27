@@ -1,7 +1,8 @@
 use std::ops::Deref;
-use tree_sitter::{InputEdit, Node, Tree};
 
-use crate::{Fixer};
+use tree_sitter::Node;
+
+use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
 pub struct DeclareDirectiveSpaceFixer {}
