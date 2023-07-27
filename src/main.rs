@@ -3,7 +3,7 @@
 
 use std::fs;
 
-use tree_sitter::{InputEdit, Language, Node, Parser, Query, QueryCursor, Tree};
+use tree_sitter::{Language, Node, Parser, Query, QueryCursor, Tree};
 
 use crate::fixers::indent_fixer::IdentFixer;
 use crate::test_utilities::{Edit, perform_edit};
@@ -13,15 +13,6 @@ mod test_utilities;
 mod constants;
 
 extern "C" { fn tree_sitter_php() -> Language; }
-
-const WHITE_SPACE: &str = " ";
-const NEW_LINE: u8 = 10; // \n
-
-#[cfg(target_family = "unix")]
-pub const LINE_BREAK: &[u8; 1] = b"\n";
-
-#[cfg(target_family = "windows")]
-pub const LINE_BREAK: &[u8; 2] = b"\r\n";
 
 pub trait Fixer {
     fn query(&self) -> &str;
@@ -62,41 +53,7 @@ pub trait Fixer {
 
         Ok(tree)
     }
-
-    fn compute_edit(&self, node: &Node, tokens: &str) -> InputEdit {
-        todo!()
-    }
-
-    fn remove_node(&self, node: &Node, source_code: &mut String) -> anyhow::Result<Option<InputEdit>> {
-        source_code.replace_range(node.byte_range(), "");
-
-        Ok(Some(self.compute_edit(node, "")))
-    }
-
-    fn build_sequence(&mut self, node: &Node, source_code: &mut String, callback: fn(token: &str) -> Vec<&str>) -> anyhow::Result<Option<InputEdit>> {
-        let mut tokens = vec![];
-
-        for child in node.children(&mut node.walk()) {
-            if let Some(value) = source_code.get(child.byte_range()) {
-                for item in callback(value) {
-                    tokens.push(item)
-                }
-            }
-        }
-
-        let tokens = tokens.join("");
-        let current_tokens = node.utf8_text(source_code.as_bytes())?;
-
-        if tokens != current_tokens {
-            source_code.replace_range(node.byte_range(), &tokens);
-
-            return Ok(Some(self.compute_edit(node, &tokens)));
-        }
-
-        Ok(None)
-    }
 }
-
 
 fn main() -> anyhow::Result<()> {
     let mut parser = Parser::new();

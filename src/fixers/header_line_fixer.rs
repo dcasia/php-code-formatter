@@ -1,6 +1,6 @@
 use tree_sitter::{InputEdit, Node, Tree};
 
-use crate::{Fixer, NEW_LINE};
+use crate::{Fixer};
 use crate::test_utilities::Edit;
 
 pub struct HeaderLineFixer {}
