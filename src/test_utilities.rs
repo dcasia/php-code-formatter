@@ -1,7 +1,6 @@
 use tree_sitter::{InputEdit, Node, Parser, Point, Tree};
 
-use crate::tree_sitter_php;
-use crate::fixer::Fixer;
+use crate::fixer::{Fixer, tree_sitter_php};
 
 #[derive(Debug)]
 pub struct Edit {

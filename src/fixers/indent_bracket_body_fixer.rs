@@ -1,7 +1,7 @@
 use std::ops::Sub;
 
 use anyhow::Context;
-use tree_sitter::{Node, Tree};
+use tree_sitter::Node;
 
 use crate::constants::{IDENT, IDENT_STR, LINE_BREAK, LINE_BREAK_STR};
 use crate::fixer::Fixer;
@@ -157,14 +157,16 @@ impl Fixer for IndentBracketBodyFixer {
 mod tests {
     use indoc::indoc;
 
+    use crate::fixer::FixerTestRunner;
     use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
-    use crate::test_utilities::run_fixer;
 
-    pub fn assert_inputs(input: &str, output: &str) {
-        let left = String::from_utf8(run_fixer(input.into(), IndentBracketBodyFixer {})).unwrap();
-        let right = output.to_string();
+    pub fn assert_inputs(input: &'static str, output: &'static str) {
+        let mut runner = FixerTestRunner::new();
 
-        assert_eq!(left, right);
+        runner.with_fixer(Box::new(IndentBracketBodyFixer {}));
+        runner.with_input(input);
+        runner.with_expected_output(output);
+        runner.assert();
     }
 
     #[test]
