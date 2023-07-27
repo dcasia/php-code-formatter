@@ -5,7 +5,7 @@ use std::fs;
 
 use tree_sitter::{Language, Node, Parser, Query, QueryCursor, Tree};
 
-use crate::fixers::indent_fixer::IdentFixer;
+use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
 use crate::test_utilities::{Edit, perform_edit};
 
 mod fixers;
@@ -17,7 +17,7 @@ extern "C" { fn tree_sitter_php() -> Language; }
 pub trait Fixer {
     fn query(&self) -> &str;
 
-    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit>;
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit>;
 
     fn exec(&mut self, mut tree: Tree, parser: &mut Parser, source_code: &mut Vec<u8>, language: &Language) -> anyhow::Result<Tree> {
         let mut cursor = QueryCursor::new();
@@ -33,7 +33,7 @@ pub trait Fixer {
             let mut should_break = true;
 
             for mut node in nodes {
-                if let Some(edit) = self.fix(&node, source_code, &tree) {
+                if let Some(edit) = self.fix(&node, source_code) {
                     if edit.inserted_text != source_code[node.byte_range()].to_vec() {
                         perform_edit(&mut tree, source_code, &edit);
 
@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         // || Box::new(DeclareDirectiveSpaceFixer {}),
         // || Box::new(DeclareDirectiveExistenceFixer {}),
         // || Box::new(FunctionArgumentsSpaceFixer {}),
-        || Box::new(IdentFixer {}),
+        || Box::new(IndentBracketBodyFixer {}),
         // || Box::new(HeaderLineFixer {}),
     ];
 

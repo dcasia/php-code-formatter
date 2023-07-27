@@ -10,7 +10,7 @@ impl Fixer for ArrayBracketSpaceFixer {
         "(array_creation_expression) @value"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit> {
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
         let tokens: Vec<u8> = node
             .children(&mut node.walk())
             .map(|child| match child.kind() {

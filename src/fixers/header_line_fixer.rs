@@ -31,7 +31,7 @@ impl Fixer for HeaderLineFixer {
         "(php_tag) @tag (declare_statement) @declare (namespace_definition) @namespace (namespace_use_declaration) @use"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit> {
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
         todo!();
         // match node.next_sibling() {
         //     None => Ok((None, None)),

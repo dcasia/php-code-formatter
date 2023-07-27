@@ -7,9 +7,9 @@ use crate::constants::{IDENT, IDENT_STR, LINE_BREAK, LINE_BREAK_STR};
 use crate::Fixer;
 use crate::test_utilities::Edit;
 
-pub struct IdentFixer {}
+pub struct IndentBracketBodyFixer {}
 
-impl IdentFixer {
+impl IndentBracketBodyFixer {
     fn ident_compound_statement_node(
         &self,
         node: &Node,
@@ -81,6 +81,39 @@ impl IdentFixer {
             })
     }
 
+    fn handle_node(&self, child: &Node, source_code: &Vec<u8>, level: usize) -> Vec<u8> {
+        let mut tokens = source_code[child.byte_range()].to_vec();
+        let current_level = level + 1;
+
+        let mut ident = IDENT.repeat(current_level).to_vec();
+        ident.append(&mut tokens);
+
+        if let Some(_) = child.next_sibling().filter(|node| node.kind() != ",") {
+            ident.extend_from_slice(LINE_BREAK);
+        }
+
+        for inner_child in child.children(&mut child.walk()) {
+            //--------------------------------------------------------------------------------------
+            let node: Option<Node> = match inner_child.kind() {
+                "compound_statement" => Some(inner_child),
+                "switch_block" => self.handle_switch_block(inner_child),
+                "assignment_expression" => self.handle_anonymous_function(inner_child),
+                _ => self.handle_default(inner_child),
+            };
+
+            if let Some(inner_child) = node {
+                //----------------------------------------------------------------------------------
+                self.ident_compound_statement_node(
+                    &inner_child, &child, &mut ident, source_code, current_level,
+                );
+                //----------------------------------------------------------------------------------
+            }
+            //--------------------------------------------------------------------------------------
+        }
+
+        ident
+    }
+
     fn process(&self, node: &Node, source_code: &Vec<u8>, level: usize) -> Vec<u8> {
         node.children(&mut node.walk())
             .map(|child| match child.kind() {
@@ -97,52 +130,19 @@ impl IdentFixer {
                 }
                 "}" => format!("{}}}", IDENT_STR.repeat(level)).as_bytes().to_vec(),
                 "," => format!(",{}", LINE_BREAK_STR).as_bytes().to_vec(),
-                _ => {
-                    //------------------------------------------------------------------------------
-                    let mut tokens = source_code[child.byte_range()].to_vec();
-                    let current_level = level + 1;
-
-                    let mut ident = IDENT.repeat(current_level).to_vec();
-                    ident.append(&mut tokens);
-
-                    if let Some(_) = child.next_sibling().filter(|node| node.kind() != ",") {
-                        ident.extend_from_slice(LINE_BREAK);
-                    }
-
-                    for inner_child in child.children(&mut child.walk()) {
-                        //--------------------------------------------------------------------------
-                        let node: Option<Node> = match inner_child.kind() {
-                            "compound_statement" => Some(inner_child),
-                            "switch_block" => self.handle_switch_block(inner_child),
-                            "assignment_expression" => self.handle_anonymous_function(inner_child),
-                            _ => self.handle_default(inner_child),
-                        };
-
-                        if let Some(inner_child) = node {
-                            //----------------------------------------------------------------------
-                            self.ident_compound_statement_node(
-                                &inner_child, &child, &mut ident, source_code, current_level,
-                            );
-                            //----------------------------------------------------------------------
-                        }
-                        //--------------------------------------------------------------------------
-                    }
-
-                    ident
-                    //------------------------------------------------------------------------------
-                }
+                _ => self.handle_node(&child, source_code, level)
             })
             .flat_map(|token| token.to_owned())
             .collect()
     }
 }
 
-impl Fixer for IdentFixer {
+impl Fixer for IndentBracketBodyFixer {
     fn query(&self) -> &str {
         "(class_declaration body: (declaration_list) @brackets)"
     }
 
-    fn fix(&mut self, node: &Node, source_code: &Vec<u8>, tree: &Tree) -> Option<Edit> {
+    fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
         Some(
             Edit {
                 deleted_length: node.end_byte() - node.start_byte(),
@@ -157,11 +157,11 @@ impl Fixer for IdentFixer {
 mod tests {
     use indoc::indoc;
 
-    use crate::fixers::indent_fixer::IdentFixer;
+    use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
     use crate::test_utilities::run_fixer;
 
     pub fn assert_inputs(input: &str, output: &str) {
-        let left = String::from_utf8(run_fixer(input.into(), IdentFixer {})).unwrap();
+        let left = String::from_utf8(run_fixer(input.into(), IndentBracketBodyFixer {})).unwrap();
         let right = output.to_string();
 
         assert_eq!(left, right);
