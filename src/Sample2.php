@@ -1,9 +1,16 @@
 <?php
 
-function sample() {}
-
-function sample2() {}
-
-$example = 123;
-
-$example2 = 123;
+class GroupCodeAttribute
+{
+    public static function make()
+    {
+        static::name()
+            ->a()
+            ->b(
+                static::name()
+            ->x()
+            ->y()
+            ->z())
+            ->c();
+    }
+}

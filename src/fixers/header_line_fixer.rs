@@ -29,8 +29,6 @@ impl HeaderLineFixer {
             tokens.extend_from_slice(LINE_BREAK);
         }
 
-        println!("{:?}", node.utf8_text(source_code).unwrap());
-
         tokens
     }
 

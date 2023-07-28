@@ -25,7 +25,7 @@ pub trait Fixer {
                 index += 1;
 
                 if let Some(edit) = self.fix(&node, source_code) {
-                    if edit.inserted_text != source_code[node.byte_range()].to_vec() {
+                    if *edit.inserted_text != source_code[node.byte_range()] {
                         perform_edit(&mut tree, source_code, &edit);
 
                         tree = parser.parse(&source_code, Some(&tree)).expect("error re-parsing code.");

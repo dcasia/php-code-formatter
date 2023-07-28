@@ -4,8 +4,13 @@
 use std::fs;
 
 use crate::fixer::{Fixer, FixerRunner};
+use crate::fixers::array_bracket_space_fixer::ArrayBracketSpaceFixer;
+use crate::fixers::declare_directive_existence_fixer::DeclareDirectiveExistenceFixer;
+use crate::fixers::declare_directive_space_fixer::DeclareDirectiveSpaceFixer;
+use crate::fixers::function_arguments_space_fixer::FunctionArgumentsSpaceFixer;
 use crate::fixers::header_line_fixer::HeaderLineFixer;
 use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
+use crate::fixers::indent_chained_call_fixer::IndentChainedCallFixer;
 
 mod fixers;
 mod test_utilities;
@@ -15,13 +20,14 @@ mod fixer;
 fn main() -> anyhow::Result<()> {
     let mut runner = FixerRunner::new();
 
-    let fixers: [fn() -> Box<dyn Fixer>; 1] = [
-        //|| Box::new(ArrayBracketSpaceFixer {}),
-        //|| Box::new(DeclareDirectiveSpaceFixer {}),
-        //|| Box::new(DeclareDirectiveExistenceFixer {}),
-        //|| Box::new(FunctionArgumentsSpaceFixer {}),
-        //|| Box::new(IndentBracketBodyFixer {}),
-        || Box::new(HeaderLineFixer {}),
+    let fixers: [fn() -> Box<dyn Fixer>; 2] = [
+        // || Box::new(ArrayBracketSpaceFixer {}),
+        // || Box::new(DeclareDirectiveSpaceFixer {}),
+        // || Box::new(DeclareDirectiveExistenceFixer {}),
+        // || Box::new(FunctionArgumentsSpaceFixer {}),
+        || Box::new(IndentBracketBodyFixer {}),
+        || Box::new(IndentChainedCallFixer {}),
+        // || Box::new(HeaderLineFixer {}),
     ];
 
     fixers.iter().for_each(|fixer| runner.add_fixer(fixer()));
