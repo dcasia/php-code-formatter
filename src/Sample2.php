@@ -4,13 +4,14 @@ class GroupCodeAttribute
 {
     public static function make()
     {
-        static::name()
+        static::one()
             ->a()
-            ->b(
-                static::name()
-            ->x()
-            ->y()
-            ->z())
-            ->c();
+            ->b(static::two()
+                ->x()
+                ->y()
+                ->z()
+                ->w())
+            ->c()
+            ->d();
     }
 }

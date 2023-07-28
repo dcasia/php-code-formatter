@@ -3,7 +3,7 @@ use std::ops::Sub;
 use anyhow::Context;
 use tree_sitter::{Node, Point};
 
-use crate::constants::{IDENT, IDENT_STR, LINE_BREAK, LINE_BREAK_STR};
+use crate::constants::{IDENT, IDENT_SIZE, LINE_BREAK};
 use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
@@ -123,7 +123,6 @@ impl IndentChainedCallFixer {
                         // tokens.extend_from_slice(b";");
                     }
 
-
                     tokens
                 }
             })
@@ -143,39 +142,98 @@ impl IndentChainedCallFixer {
             };
 
             if parent.kind() == "argument" {
-
                 let mut ident = LINE_BREAK.as_slice().to_vec();
 
                 ident.extend_from_slice(&IDENT.repeat(4).to_vec());
                 ident.extend_from_slice(&response);
 
                 return ident;
-
             }
-
         }
 
         response
+    }
+
+    fn is_root_expression(&self, node: &Node) -> bool {
+        if let Some(parent) = node.parent() {
+            return parent.kind() != node.kind()
+        }
+        false
+    }
+
+    fn process_children(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        node.children(&mut node.walk())
+            .map(|child| match child.kind() {
+                "member_call_expression" => self.process_children(&child, source_code),
+                _ => source_code[child.byte_range()].to_vec()
+            })
+            .flat_map(|token| token.to_owned())
+            .collect()
+    }
+
+    fn get_parent_ident(&self, node: &Node) -> usize {
+        let mut current = node.to_owned();
+
+        let parent = loop {
+            if let Some(parent) = current.parent() {
+                if current.kind() != node.kind() {
+                    break current;
+                }
+
+                current = parent;
+            }
+        };
+
+        println!("{:?}", parent);
+
+        parent.start_position().column
+    }
+
+    fn process_root(&self, node: &Node, source_code: &Vec<u8>, length: usize) -> Vec<u8> {
+        if length <= 3 {
+            return self.process_children(node, source_code);
+        }
+
+        let ident_level = (node.start_position().column / IDENT_SIZE).max(IDENT_SIZE - 1);
+
+        node.children(&mut node.walk())
+            .map(|child| match child.kind() {
+                "member_call_expression" => self.process_root(&child, source_code, length),
+                "->" => {
+
+                    let mut ident = LINE_BREAK.as_slice().to_vec();
+
+                    ident.append(&mut IDENT.repeat(ident_level).to_vec());
+                    ident.extend_from_slice(&source_code[child.byte_range()]);
+                    ident
+
+                },
+                _ => source_code[child.byte_range()].to_vec()
+            })
+            .flat_map(|token| token.to_owned())
+            .collect()
     }
 }
 
 impl Fixer for IndentChainedCallFixer {
     fn query(&self) -> &str {
-        "
-        (expression_statement (member_call_expression) @chain)
-        (argument (member_call_expression) @chain)
-        "
+        "(member_call_expression) @chain"
     }
 
     fn fix(&mut self, node: &Node, source_code: &Vec<u8>) -> Option<Edit> {
-        let member_count = self.count_chain(&node);
-        let inserted_text = self.process(&node, source_code, true, member_count, member_count);
+        if self.is_root_expression(node) == false {
+            return None;
+        }
+
+        println!("ROOT: {:?}", node.utf8_text(source_code).unwrap());
+
+        let length = self.count_chain(node);
 
         Some(
             Edit {
                 deleted_length: node.end_byte() - node.start_byte(),
                 position: node.start_byte(),
-                inserted_text: inserted_text,
+                inserted_text: self.process_root(node, source_code, length),
             }
         )
     }

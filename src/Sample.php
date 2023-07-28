@@ -4,6 +4,9 @@ class GroupCodeAttribute
 {
     public static function make()
     {
-        static::name()->a()->b(static::name()->x()->y()->z())->c();
+static::one()
+->a()->b(static::two()
+->x()->y()
+->z()->w())->c()->d();
     }
 }
