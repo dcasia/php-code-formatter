@@ -1,6 +1,6 @@
-pub const IDENT_STR: &str = "    ";
-pub const IDENT: &[u8] = IDENT_STR.as_bytes();
-pub const IDENT_SIZE: usize = IDENT_STR.len();
+pub const INDENT_STR: &str = "    ";
+pub const INDENT: &[u8] = INDENT_STR.as_bytes();
+pub const INDENT_SIZE: usize = INDENT_STR.len();
 
 #[cfg(windows)]
 pub const LINE_BREAK: &[u8; 1] = b"\n";

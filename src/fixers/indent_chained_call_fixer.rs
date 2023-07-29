@@ -3,7 +3,7 @@ use std::ops::Sub;
 use anyhow::Context;
 use tree_sitter::{Node, Point};
 
-use crate::constants::{IDENT, IDENT_SIZE, LINE_BREAK};
+use crate::constants::{INDENT, INDENT_SIZE, LINE_BREAK};
 use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
@@ -47,11 +47,11 @@ impl IndentChainedCallFixer {
 
         // let current_level = level + 1;
         //
-        // let mut ident = IDENT.repeat(current_level).to_vec();
-        // ident.append(&mut tokens);
+        // let mut indent = indent.repeat(current_level).to_vec();
+        // indent.append(&mut tokens);
         //
         // if let Some(_) = child.next_sibling().filter(|node| node.kind() != ",") {
-        //     ident.extend_from_slice(LINE_BREAK);
+        //     indent.extend_from_slice(LINE_BREAK);
         // }
 
         tokens
@@ -95,24 +95,24 @@ impl IndentChainedCallFixer {
         // }
 
         let start = node.start_position().column;
-        let current_level = (IDENT.len() % start).checked_sub(1).unwrap_or(0);
+        let current_level = (INDENT.len() % start).checked_sub(1).unwrap_or(0);
 
         let mut response: Vec<u8> = node.children(&mut node.walk())
             .map(|child| match child.kind() {
                 "->" => {
-                    let mut ident = LINE_BREAK.as_slice().to_vec();
+                    let mut indent = LINE_BREAK.as_slice().to_vec();
 
-                    ident.append(&mut IDENT.repeat(current_level).to_vec());
-                    ident.extend_from_slice(&source_code[child.byte_range()]);
+                    indent.append(&mut INDENT.repeat(current_level).to_vec());
+                    indent.extend_from_slice(&source_code[child.byte_range()]);
 
                     let start = child.prev_sibling().unwrap().start_byte();
                     let root_start = node.start_byte();
 
                     if child.next_named_sibling().is_none() {
-                        ident.extend_from_slice(LINE_BREAK);
+                        indent.extend_from_slice(LINE_BREAK);
                     }
 
-                    ident
+                    indent
                 }
                 "member_call_expression" => self.process(&child, source_code, false, member_count, child_id - 1),
                 _ => {
@@ -142,12 +142,12 @@ impl IndentChainedCallFixer {
             };
 
             if parent.kind() == "argument" {
-                let mut ident = LINE_BREAK.as_slice().to_vec();
+                let mut indent = LINE_BREAK.as_slice().to_vec();
 
-                ident.extend_from_slice(&IDENT.repeat(4).to_vec());
-                ident.extend_from_slice(&response);
+                indent.extend_from_slice(&INDENT.repeat(4).to_vec());
+                indent.extend_from_slice(&response);
 
-                return ident;
+                return indent;
             }
         }
 
@@ -171,7 +171,7 @@ impl IndentChainedCallFixer {
             .collect()
     }
 
-    fn get_parent_ident(&self, node: &Node) -> usize {
+    fn get_parent_indent(&self, node: &Node) -> usize {
         let mut current = node.to_owned();
 
         let parent = loop {
@@ -194,18 +194,18 @@ impl IndentChainedCallFixer {
             return self.process_children(node, source_code);
         }
 
-        let ident_level = (node.start_position().column / IDENT_SIZE).max(IDENT_SIZE - 1);
+        let indent_level = (node.start_position().column / INDENT_SIZE).max(INDENT_SIZE - 1);
 
         node.children(&mut node.walk())
             .map(|child| match child.kind() {
                 "member_call_expression" => self.process_root(&child, source_code, length),
                 "->" => {
 
-                    let mut ident = LINE_BREAK.as_slice().to_vec();
+                    let mut indent = LINE_BREAK.as_slice().to_vec();
 
-                    ident.append(&mut IDENT.repeat(ident_level).to_vec());
-                    ident.extend_from_slice(&source_code[child.byte_range()]);
-                    ident
+                    indent.append(&mut INDENT.repeat(indent_level).to_vec());
+                    indent.extend_from_slice(&source_code[child.byte_range()]);
+                    indent
 
                 },
                 _ => source_code[child.byte_range()].to_vec()

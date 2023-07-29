@@ -20,13 +20,13 @@ mod fixer;
 fn main() -> anyhow::Result<()> {
     let mut runner = FixerRunner::new();
 
-    let fixers: [fn() -> Box<dyn Fixer>; 2] = [
+    let fixers: [fn() -> Box<dyn Fixer>; 1] = [
         // || Box::new(ArrayBracketSpaceFixer {}),
         // || Box::new(DeclareDirectiveSpaceFixer {}),
         // || Box::new(DeclareDirectiveExistenceFixer {}),
         // || Box::new(FunctionArgumentsSpaceFixer {}),
         || Box::new(IndentBracketBodyFixer {}),
-        || Box::new(IndentChainedCallFixer {}),
+        //|| Box::new(IndentChainedCallFixer {}),
         // || Box::new(HeaderLineFixer {}),
     ];
 

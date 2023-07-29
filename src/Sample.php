@@ -1,12 +1,16 @@
 <?php
 
-class GroupCodeAttribute
+class Test
 {
-    public static function make()
+    function sample()
     {
-static::one()
-->a()->b(static::two()
-->x()->y()
-->z()->w())->c()->d();
+        then(
+            function () {
+                $example = 1;
+            },
+            function () {
+                $example = 1;
+            }
+        );
     }
 }
