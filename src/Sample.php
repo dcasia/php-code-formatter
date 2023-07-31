@@ -1,16 +1,6 @@
 <?php
-
-class Test
-{
-    function sample()
-    {
-        then(
-            function () {
-                $example = 1;
-            },
-            function () {
-                $example = 1;
-            }
-        );
-    }
-}
+            $a=[
+            1=>1,
+                2=>    2,
+            ];
+            $b=[ 1=>1, 2=>    2];

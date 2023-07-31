@@ -1,13 +1,9 @@
 <?php
-
-class Test
-{
-    function sample()
-    {
-        $example
-                                                          ->then(function () { $example = 1; })
-                                                          ->then(function () {
-                $example = 1;
-            });
-    }
-}
+$a = [
+1 => 1,
+2 => 2,
+];
+$b = [
+1 => 1,
+2 => 2
+];

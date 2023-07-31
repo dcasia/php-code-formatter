@@ -11,6 +11,7 @@ use crate::fixers::function_arguments_space_fixer::FunctionArgumentsSpaceFixer;
 use crate::fixers::header_line_fixer::HeaderLineFixer;
 use crate::fixers::indent_bracket_body_fixer::IndentBracketBodyFixer;
 use crate::fixers::indent_chained_call_fixer::IndentChainedCallFixer;
+use crate::fixers::normalizer_fixer::NormalizerFixer;
 
 mod fixers;
 mod test_utilities;
@@ -21,11 +22,12 @@ fn main() -> anyhow::Result<()> {
     let mut runner = FixerRunner::new();
 
     let fixers: [fn() -> Box<dyn Fixer>; 1] = [
+        || Box::new(NormalizerFixer {}),
         // || Box::new(ArrayBracketSpaceFixer {}),
         // || Box::new(DeclareDirectiveSpaceFixer {}),
         // || Box::new(DeclareDirectiveExistenceFixer {}),
         // || Box::new(FunctionArgumentsSpaceFixer {}),
-        || Box::new(IndentBracketBodyFixer {}),
+        // || Box::new(IndentBracketBodyFixer {}),
         //|| Box::new(IndentChainedCallFixer {}),
         // || Box::new(HeaderLineFixer {}),
     ];
