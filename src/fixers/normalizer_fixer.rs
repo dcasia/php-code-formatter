@@ -101,9 +101,17 @@ impl NormalizerFixer {
 
     fn handle_close_parenthesis(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(previous) = node.prev_sibling() {
-            if previous.kind() == "(" {
+
+            println!("{:?}", node.parent().unwrap().utf8_text(source_code).unwrap());
+
+            if previous.kind() == "argument" && node.parent().unwrap().kind() == "formal_parameters" {
                 return self.pass_through(&node, &source_code);
             }
+
+            return match previous.kind() {
+                "," | "(" => self.pass_through(&node, &source_code),
+                _ => self.line_break_before(&node, &source_code),
+            };
         }
 
         self.line_break_before(&node, &source_code)
@@ -111,7 +119,7 @@ impl NormalizerFixer {
 
     fn handle_close_squiggly_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if node.next_sibling().is_none() {
-            return self.line_break_after(&node, &source_code)
+            return self.line_break_after(&node, &source_code);
         }
 
         self.pass_through(&node, &source_code)
@@ -650,6 +658,50 @@ mod tests {
             class Test
             {
             public function a(): A | B | string | null | bool
+            {
+            }
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn closing_parenthesis_does_not_add_unnecessary_new_lines() {
+        let input = indoc! {"
+            <?php
+            wrapper($class->icon(function () {}));
+        "};
+
+        let output = indoc! {"
+            <?php
+            wrapper(
+            $class
+            ->icon(
+            function ()
+            {
+            }
+            )
+            );
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn closing_brackets_does_not_add_unnecessary_new_lines() {
+        let input = indoc! {"
+            <?php
+            class Test {
+            public function name() {}
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            class Test
+            {
+            public function name()
             {
             }
             }

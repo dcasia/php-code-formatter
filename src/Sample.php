@@ -1,6 +1,3 @@
 <?php
-            $a=[
-            1=>1,
-                2=>    2,
-            ];
-            $b=[ 1=>1, 2=>    2];
+
+wrapper($class->icon(function () {}));
