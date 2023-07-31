@@ -154,8 +154,24 @@ impl NormalizerFixer {
         self.line_break_before(&node, &source_code)
     }
 
+    fn handle_static_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+            if let Some(previous) = parent.prev_sibling() {
+                if previous.kind() == "visibility_modifier" {
+                    return self.space_before(&node, &source_code);
+                }
+            }
+        }
+
+        self.pass_through(&node, &source_code)
+    }
+
     fn handle_function(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(previous) = node.prev_sibling() {
+            if previous.kind() == "static_modifier" {
+                return self.space_before_and_after(&node, &source_code);
+            }
+
             if previous.kind() == "visibility_modifier" {
                 return self.space_before_and_after(&node, &source_code);
             }
@@ -212,6 +228,7 @@ impl NormalizerFixer {
                     "return" => self.handle_return(&child, &source_code),
                     "," | ";" => self.line_break_after(&child, &source_code),
                     "function" => self.handle_function(&child, &source_code),
+                    "static" => self.handle_static_modifier(&child, &source_code),
                     "->" => self.line_break_before(&child, &source_code),
 
                     // Brackets / Parenthesis
@@ -486,6 +503,10 @@ mod tests {
                 public   function    a() {}
                 private    function    c() {}
                 protected    function    d() {}
+                static  function    e() {}
+                public static  function    f()  {  }
+                private    static  function    g()  { }
+                protected    static  function    h()    {}
             }
         "};
 
@@ -503,6 +524,18 @@ mod tests {
             {
             }
             protected function d()
+            {
+            }
+            static function e()
+            {
+            }
+            public static function f()
+            {
+            }
+            private static function g()
+            {
+            }
+            protected static function h()
             {
             }
             }
