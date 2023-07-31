@@ -183,6 +183,10 @@ impl NormalizerFixer {
     fn handle_operators(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if node.kind() == ":" {
             if let Some(previous) = node.prev_sibling() {
+                if previous.kind() == "formal_parameters" {
+                    return self.space_after(&node, &source_code);
+                }
+
                 if previous.kind() == "?" {
                     return self.space_after(&node, &source_code);
                 }
@@ -191,6 +195,10 @@ impl NormalizerFixer {
 
         if node.kind() == "?" {
             if let Some(next) = node.next_sibling() {
+                if next.kind() == "named_type" {
+                    return self.pass_through(&node, &source_code);
+                }
+
                 if next.kind() == ":" {
                     return self.space_before(&node, &source_code);
                 }
@@ -591,6 +599,60 @@ mod tests {
             1 => 1,
             2 => 2
             ];
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn optional_return_type_is_correctly_normalized() {
+        let input = indoc! {"
+            <?php
+            class Test
+            {
+                public function a()   : ?  A  { }
+                public function b():?B{ }
+                public function c(): ?C { }
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            class Test
+            {
+            public function a(): ?A
+            {
+            }
+            public function b(): ?B
+            {
+            }
+            public function c(): ?C
+            {
+            }
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn union_return_types_are_correctly_normalized() {
+        let input = indoc! {"
+            <?php
+            class Test
+            {
+                public function a(): A    |B|  string |null|bool   { }
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            class Test
+            {
+            public function a(): A | B | string | null | bool
+            {
+            }
+            }
         "};
 
         assert_inputs(input, output);
