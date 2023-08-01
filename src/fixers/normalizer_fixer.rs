@@ -148,6 +148,12 @@ impl NormalizerFixer {
     }
 
     fn handle_close_squiggly_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+            if parent.kind() == "declaration_list" {
+                return self.pass_through(&node, &source_code);
+            }
+        }
+
         match node.next_sibling() {
             None => self.line_break_after(&node, &source_code),
             Some(_) => self.pass_through(&node, &source_code)
@@ -323,6 +329,7 @@ impl NormalizerFixer {
                     "array" | "mixed" | "object" | "callable" | "resource"
                     => self.handle_primitive_parameters(&child, &source_code),
 
+                    "new" => self.space_after(&child, &source_code),
                     "name" => self.handle_name_kind(&child, &source_code),
                     "return" => self.handle_return(&child, &source_code),
                     "," | ";" => self.line_break_after(&child, &source_code),
@@ -871,6 +878,25 @@ mod tests {
             b: 2,
             c: 3
             );
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn new_keyword_is_spaced() {
+        let input = indoc! {"
+            <?php
+            $object=new      MyObject();
+            $class  =  new    class()   {    };
+        "};
+
+        let output = indoc! {"
+            <?php
+            $object = new MyObject();
+            $class = new class ()
+            {
+            };
         "};
 
         assert_inputs(input, output);
