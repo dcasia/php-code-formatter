@@ -245,7 +245,7 @@ impl NormalizerFixer {
                     "," | ";" => self.line_break_after(&child, &source_code),
                     "function" => self.handle_function(&child, &source_code),
                     "static" => self.handle_static_modifier(&child, &source_code),
-                    "->" => self.line_break_before(&child, &source_code),
+                    "->" | "?->" => self.line_break_before(&child, &source_code),
 
                     // Brackets / Parenthesis
                     "[" => self.handle_open_array_bracket(&child, &source_code),
@@ -485,8 +485,8 @@ mod tests {
     fn chained_calls_are_broken_into_new_lines() {
         let input = indoc! {"
             <?php
-            $a->b($b->a()->b())->c();
-            $a->b($b->a->b)->c;
+            $a->b($b->a()?->b())->c();
+            $a->b($b->a->b)?->c;
         "};
 
         let output = indoc! {"
@@ -495,7 +495,7 @@ mod tests {
             ->b(
             $b
             ->a()
-            ->b()
+            ?->b()
             )
             ->c();
             $a
@@ -504,7 +504,7 @@ mod tests {
             ->a
             ->b
             )
-            ->c;
+            ?->c;
         "};
 
         assert_inputs(input, output);
