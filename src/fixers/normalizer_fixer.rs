@@ -4,7 +4,43 @@ use crate::constants::LINE_BREAK;
 use crate::fixer::Fixer;
 use crate::test_utilities::Edit;
 
+enum Sequence {
+    Parent,
+    Next,
+    NextNamed,
+    NextIsNoneParent,
+    PreviousIsNoneParent,
+    Previous,
+    PreviousNamed
+}
+
 pub struct NormalizerFixer {}
+
+impl NormalizerFixer {
+    fn get_node_sequence<'a>(&self, node: &'a Node, sequence: &[Sequence]) -> Option<Node<'a>> {
+        sequence.iter().fold(Some(*node), |node, sequence| {
+            if let Some(node) = node {
+                match sequence {
+                    Sequence::Parent => node.parent(),
+                    Sequence::Next => node.next_sibling(),
+                    Sequence::NextNamed => node.next_named_sibling(),
+                    Sequence::Previous => node.prev_sibling(),
+                    Sequence::PreviousNamed => node.prev_named_sibling(),
+                    Sequence::NextIsNoneParent => match node.next_sibling() {
+                        None => node.parent(),
+                        Some(_) => None,
+                    },
+                    Sequence::PreviousIsNoneParent => match node.prev_sibling() {
+                        None => node.parent(),
+                        Some(_) => None,
+                    },
+                }
+            } else {
+                None
+            }
+        })
+    }
+}
 
 impl NormalizerFixer {
     fn line_break_before_and_after(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
@@ -15,19 +51,19 @@ impl NormalizerFixer {
         line_break
     }
 
+    fn line_break_before(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        let mut line_break = LINE_BREAK.to_vec();
+        line_break.extend_from_slice(&source_code[node.byte_range()]);
+
+        line_break
+    }
+
     fn space_before_and_after(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         let mut tokens = b" ".to_vec();
         tokens.extend_from_slice(&source_code[node.byte_range()]);
         tokens.extend_from_slice(b" ");
 
         tokens
-    }
-
-    fn line_break_before(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
-        let mut line_break = LINE_BREAK.to_vec();
-        line_break.extend_from_slice(&source_code[node.byte_range()]);
-
-        line_break
     }
 
     fn line_break_before_and_space_after(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
@@ -55,14 +91,7 @@ impl NormalizerFixer {
     fn space_after(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         let mut tokens = source_code[node.byte_range()].to_vec();
 
-        // println!("{:?}", node.next_sibling());
-
-        // Only if the next element is on the same row
-        // if let Some(next) = node.next_sibling() {
-        //     if next.start_position().row == node.start_position().row {
         tokens.extend_from_slice(b" ");
-        // }
-        // }
 
         tokens
     }
@@ -70,7 +99,9 @@ impl NormalizerFixer {
     fn pass_through(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         source_code[node.byte_range()].to_vec()
     }
+}
 
+impl NormalizerFixer {
     fn handle_return(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(next) = node.next_sibling() {
             if next.kind() == ";" {
@@ -103,9 +134,9 @@ impl NormalizerFixer {
 
     fn handle_close_parenthesis(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(previous) = node.prev_sibling() {
-            if previous.kind() == "argument" && node.parent().unwrap().kind() == "formal_parameters" {
-                return self.pass_through(&node, &source_code);
-            }
+            // if previous.kind() == "argument" && node.parent().unwrap().kind() == "formal_parameters" {
+            //     return self.pass_through(&node, &source_code);
+            // }
 
             return match previous.kind() {
                 "," | "(" => self.pass_through(&node, &source_code),
@@ -117,11 +148,10 @@ impl NormalizerFixer {
     }
 
     fn handle_close_squiggly_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
-        if node.next_sibling().is_none() {
-            return self.line_break_after(&node, &source_code);
+        match node.next_sibling() {
+            None => self.line_break_after(&node, &source_code),
+            Some(_) => self.pass_through(&node, &source_code)
         }
-
-        self.pass_through(&node, &source_code)
     }
 
     fn handle_open_array_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
@@ -208,17 +238,6 @@ impl NormalizerFixer {
     }
 
     fn handle_dollar_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
-        if let Some(parent) = node.parent() {
-
-            // println!("{:?} {:?}", node.utf8_text(&source_code).unwrap(), parent.prev_sibling().unwrap().utf8_text(&source_code).unwrap());
-
-            // if let Some(previous) = parent.prev_sibling() {
-            //     if previous.kind() == "union_type" {
-            //         return self.space_before(&node, &source_code);
-            //     }
-            // }
-        }
-
         self.pass_through(&node, &source_code)
     }
 
@@ -231,16 +250,15 @@ impl NormalizerFixer {
             }
 
             if parent.kind() == "named_type" {
+                let sequence = self.get_node_sequence(&parent, &[
+                    Sequence::Parent,
+                    Sequence::NextIsNoneParent,
+                    Sequence::Next,
+                ]);
 
-                if let Some(grant_parent) = parent.parent() {
-                    if grant_parent.next_sibling().is_none() {
-                        if let Some(grant_parent) = grant_parent.parent() {
-                            if let Some(next) = grant_parent.next_sibling() {
-                                if next.kind() == "compound_statement" {
-                                    return self.pass_through(&node, &source_code);
-                                }
-                            }
-                        }
+                if let Some(parent) = sequence {
+                    if parent.kind() == "compound_statement" {
+                        return self.pass_through(&node, &source_code);
                     }
                 }
 
