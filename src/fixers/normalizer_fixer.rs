@@ -55,12 +55,14 @@ impl NormalizerFixer {
     fn space_after(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         let mut tokens = source_code[node.byte_range()].to_vec();
 
+        // println!("{:?}", node.next_sibling());
+
         // Only if the next element is on the same row
-        if let Some(next) = node.next_sibling() {
-            if next.start_position().row == node.start_position().row {
-                tokens.extend_from_slice(b" ");
-            }
-        }
+        // if let Some(next) = node.next_sibling() {
+        //     if next.start_position().row == node.start_position().row {
+        tokens.extend_from_slice(b" ");
+        // }
+        // }
 
         tokens
     }
@@ -101,9 +103,6 @@ impl NormalizerFixer {
 
     fn handle_close_parenthesis(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(previous) = node.prev_sibling() {
-
-            println!("{:?}", node.parent().unwrap().utf8_text(source_code).unwrap());
-
             if previous.kind() == "argument" && node.parent().unwrap().kind() == "formal_parameters" {
                 return self.pass_through(&node, &source_code);
             }
@@ -133,7 +132,7 @@ impl NormalizerFixer {
         }
 
         if let Some(previous) = node.prev_sibling() {
-            if previous.kind() == "variable_name" {
+            if ["variable_name", "member_access_expression"].contains(&previous.kind()) {
                 return self.space_after(&node, &source_code);
             }
         }
@@ -143,7 +142,7 @@ impl NormalizerFixer {
 
     fn handle_close_array_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(previous) = node.prev_sibling() {
-            if previous.kind() == "[" {
+            if ["[", ","].contains(&previous.kind()) {
                 return self.pass_through(&node, &source_code);
             }
 
@@ -154,7 +153,6 @@ impl NormalizerFixer {
                 "encapsed_string" |
                 "binary_expression" |
                 "member_access_expression" => self.space_before(&node, &source_code),
-                "," => self.pass_through(&node, &source_code),
                 _ => self.line_break_before(&node, &source_code),
             }
         }
@@ -186,6 +184,71 @@ impl NormalizerFixer {
         }
 
         self.space_after(&node, &source_code)
+    }
+
+    fn handle_primitive_parameters(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+            if parent.kind() == "primitive_type" {
+                if parent.next_sibling().is_none() {
+                    // If it is at the tail of the function, we do nothing
+                    if let Some(grant_parent) = parent.parent() {
+                        if let Some(next) = grant_parent.next_sibling() {
+                            if next.kind() == "compound_statement" {
+                                return self.pass_through(&node, &source_code);
+                            }
+                        }
+                    }
+
+                    return self.space_after(&node, &source_code);
+                }
+            }
+        }
+
+        self.pass_through(&node, &source_code)
+    }
+
+    fn handle_dollar_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+
+            // println!("{:?} {:?}", node.utf8_text(&source_code).unwrap(), parent.prev_sibling().unwrap().utf8_text(&source_code).unwrap());
+
+            // if let Some(previous) = parent.prev_sibling() {
+            //     if previous.kind() == "union_type" {
+            //         return self.space_before(&node, &source_code);
+            //     }
+            // }
+        }
+
+        self.pass_through(&node, &source_code)
+    }
+
+    fn handle_name_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+            if let Some(next) = parent.next_sibling() {
+                if next.kind() == "|" {
+                    return self.pass_through(&node, &source_code);
+                }
+            }
+
+            if parent.kind() == "named_type" {
+
+                if let Some(grant_parent) = parent.parent() {
+                    if grant_parent.next_sibling().is_none() {
+                        if let Some(grant_parent) = grant_parent.parent() {
+                            if let Some(next) = grant_parent.next_sibling() {
+                                if next.kind() == "compound_statement" {
+                                    return self.pass_through(&node, &source_code);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return self.space_after(&node, &source_code);
+            }
+        }
+
+        self.pass_through(&node, &source_code)
     }
 
     fn handle_operators(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
@@ -223,7 +286,7 @@ impl NormalizerFixer {
                     return self.normalize_block(&child, &source_code);
                 }
 
-                // println!("{}", child.kind());
+                // println!("{:?} {:?}",child.kind(), child.utf8_text(&source_code).unwrap());
 
                 match child.kind() {
                     "=" | "+=" | "-=" | "*=" | "/=" | "%=" |                                        // Assignment Operators
@@ -240,7 +303,13 @@ impl NormalizerFixer {
                     "extends" |
                     "implements" => self.space_before_and_after(&child, &source_code),
                     "class" => self.handle_class_kind(&child, &source_code),
+                    "$" => self.handle_dollar_kind(&child, &source_code),
 
+                    "null" | "string" | "bool" | "float" | "int" |
+                    "array" | "mixed" | "object" | "callable" | "resource"
+                    => self.handle_primitive_parameters(&child, &source_code),
+
+                    "name" => self.handle_name_kind(&child, &source_code),
                     "return" => self.handle_return(&child, &source_code),
                     "," | ";" => self.line_break_after(&child, &source_code),
                     "function" => self.handle_function(&child, &source_code),
@@ -468,6 +537,7 @@ mod tests {
             $string ['a'] = [];
             $escapedString    [ \"a\"   ] =[];
             $expression  [1+2] =[     ];
+            $this->access [  'a'  ]
         "};
 
         let output = indoc! {"
@@ -476,6 +546,8 @@ mod tests {
             $string[ 'a' ] = [];
             $escapedString[ \"a\" ] = [];
             $expression[ 1 + 2 ] = [];
+            $this
+            ->access[ 'a' ]
         "};
 
         assert_inputs(input, output);
@@ -681,6 +753,7 @@ mod tests {
             function ()
             {
             }
+
             )
             );
         "};
@@ -704,6 +777,66 @@ mod tests {
             public function name()
             {
             }
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn named_params_are_correctly_normalized() {
+        let input = indoc! {"
+            <?php
+            function test(A $a, B|C $b, ?D $c = null) {}
+        "};
+
+        let output = indoc! {"
+            <?php
+            function test(
+            A $a,
+            B | C $b,
+            ?D $c = null
+            )
+            {
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn union_primitive_arguments_are_correctly_normalized() {
+        let input = indoc! {"
+            <?php
+            function test(
+               null    $a,
+            bool $b,
+                int  $c,
+              float  $d,
+               string $e  ,
+            array $f ,
+              object  $g,
+               callable $h,
+             resource       $i,
+              mixed       $h,
+            ) {}
+        "};
+
+        let output = indoc! {"
+            <?php
+            function test(
+            null $a,
+            bool $b,
+            int $c,
+            float $d,
+            string $e,
+            array $f,
+            object $g,
+            callable $h,
+            resource $i,
+            mixed $h,
+            )
+            {
             }
         "};
 
