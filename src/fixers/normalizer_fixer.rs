@@ -272,11 +272,7 @@ impl NormalizerFixer {
     fn handle_operators(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if node.kind() == ":" {
             if let Some(previous) = node.prev_sibling() {
-                if previous.kind() == "formal_parameters" {
-                    return self.space_after(&node, &source_code);
-                }
-
-                if previous.kind() == "?" {
+                if ["name", "formal_parameters", "?"].contains(&previous.kind()) {
                     return self.space_after(&node, &source_code);
                 }
             }
@@ -856,6 +852,25 @@ mod tests {
             )
             {
             }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn named_arguments_are_correctly_normalized() {
+        let input = indoc! {"
+            <?php
+            test(  a:1, b   :  2, c: 3);
+        "};
+
+        let output = indoc! {"
+            <?php
+            test(
+            a: 1,
+            b: 2,
+            c: 3
+            );
         "};
 
         assert_inputs(input, output);
