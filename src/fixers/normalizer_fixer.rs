@@ -294,6 +294,14 @@ impl NormalizerFixer {
             }
         }
 
+        if ["+", "-"].contains(&node.kind()) {
+            if let Some(parent) = node.parent() {
+                if parent.kind() == "unary_op_expression" {
+                    return self.pass_through(&node, &source_code);
+                }
+            }
+        }
+
         if node.kind() == "?" {
             if let Some(next) = node.next_sibling() {
                 if next.kind() == "named_type" {
@@ -944,6 +952,21 @@ mod tests {
         assert_inputs(input, output);
     }
 
+    #[test]
+    fn negative_and_floating_numbers() {
+        let input = indoc! {"
+            <?php
+            $a=-1-+1;
+            $b=-1.0+-1.-+1;
+        "};
 
+        let output = indoc! {"
+            <?php
+            $a = -1 - +1;
+            $b = -1.0 + -1. - +1;
+        "};
+
+        assert_inputs(input, output);
+    }
 
 }
