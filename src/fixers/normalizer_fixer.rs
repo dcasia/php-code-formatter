@@ -40,6 +40,40 @@ impl NormalizerFixer {
             }
         })
     }
+
+    fn next_is(&self, node: &Node, kind: &str) -> bool {
+        if let Some(next) = node.next_sibling() {
+            if next.kind() == kind {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn is_within(&self, node: &Node, kinds: &[&str]) -> bool {
+        kinds.contains(&node.kind())
+    }
+
+    fn next_is_within(&self, node: &Node, kinds: &[&str]) -> bool {
+        if let Some(next) = node.next_sibling() {
+            if kinds.contains(&next.kind()) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn previous_is_within(&self, node: &Node, kinds: &[&str]) -> bool {
+        if let Some(next) = node.prev_sibling() {
+            if kinds.contains(&next.kind()) {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 impl NormalizerFixer {
@@ -160,6 +194,12 @@ impl NormalizerFixer {
     fn handle_close_squiggly_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
             if let Some(parent) = parent.parent() {
+                if let Some(next) = parent.next_sibling() {
+                    if next.kind() != ";" {
+                        return self.line_break_after(&node, &source_code);
+                    }
+                }
+
                 if parent.kind() == "anonymous_function_creation_expression" {
                     return self.pass_through(&node, &source_code);
                 }
@@ -225,20 +265,12 @@ impl NormalizerFixer {
     }
 
     fn handle_function(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
-        if let Some(previous) = node.prev_sibling() {
-            if previous.kind() == "static_modifier" {
-                return self.space_before_and_after(&node, &source_code);
-            }
-
-            if previous.kind() == "visibility_modifier" {
-                return self.space_before_and_after(&node, &source_code);
-            }
+        if self.previous_is_within(node, &["static_modifier", "visibility_modifier"]) {
+            return self.space_before_and_after(&node, &source_code);
         }
 
-        if let Some(next) = node.next_sibling() {
-            if next.kind() == "name" {
-                return self.space_after(&node, &source_code);
-            }
+        if self.next_is(node, "name") {
+            return self.space_after(&node, &source_code);
         }
 
         self.pass_through(&node, &source_code)
@@ -249,11 +281,9 @@ impl NormalizerFixer {
             if parent.kind() == "primitive_type" {
                 if parent.next_sibling().is_none() {
                     // If it is at the tail of the function, we do nothing
-                    if let Some(grant_parent) = parent.parent() {
-                        if let Some(next) = grant_parent.next_sibling() {
-                            if next.kind() == "compound_statement" {
-                                return self.pass_through(&node, &source_code);
-                            }
+                    if let Some(parent) = parent.parent() {
+                        if self.next_is(&parent, "compound_statement") {
+                            return self.pass_through(&node, &source_code);
                         }
                     }
 
@@ -269,12 +299,22 @@ impl NormalizerFixer {
         self.pass_through(&node, &source_code)
     }
 
+    fn handle_visibility_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+            if let Some(previous) = parent.prev_sibling() {
+                if previous.kind() == "as" {
+                    return self.space_after(&node, &source_code);
+                }
+            }
+        }
+
+        self.pass_through(&node, &source_code)
+    }
+
     fn handle_name_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
-            if let Some(next) = parent.next_sibling() {
-                if next.kind() == "|" {
-                    return self.pass_through(&node, &source_code);
-                }
+            if self.next_is_within(&parent, &["|", "::", "use_list"]) {
+                return self.pass_through(&node, &source_code);
             }
 
             if parent.kind() == "qualified_name" {
@@ -284,9 +324,13 @@ impl NormalizerFixer {
                 ]);
 
                 if let Some(parent) = sequence {
-                    if parent.kind() == "|" {
+                    if self.is_within(&parent, &[";", "|"]) {
                         return self.pass_through(&node, &source_code);
                     }
+                }
+
+                if self.next_is(&parent, ";") {
+                    return self.pass_through(&node, &source_code);
                 }
 
                 return self.space_after(&node, &source_code);
@@ -375,7 +419,12 @@ impl NormalizerFixer {
                     "array" | "mixed" | "object" | "callable" | "resource"
                     => self.handle_primitive_parameters(&child, &source_code),
 
+                    "private" | "public" | "protected" => self.handle_visibility_modifier(&child, &source_code),
+
+                    "namespace" |
+                    "use" |
                     "new" => self.space_after(&child, &source_code),
+
                     "name" => self.handle_name_kind(&child, &source_code),
                     "return" => self.handle_return(&child, &source_code),
                     ";" => self.handle_semicolon(&child, &source_code),
@@ -1059,6 +1108,96 @@ mod tests {
             )
             {
             };
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn namespace_imports_and_alias() {
+        let input = indoc! {"
+            <?php
+                namespace      App\\Service ;
+               use  App\\Service\\A as B   ;
+             use App\\Service\\C   ;
+        "};
+
+        let output = indoc! {"
+            <?php
+            namespace App\\Service;
+            use App\\Service\\A as B;
+            use App\\Service\\C;
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn traits() {
+        let input = indoc! {"
+            <?php
+            class Test
+            {
+                use  A ;
+                use A\\B ;
+                use A\\C {
+                    A\\C::test   as  test2;
+                    test  as  test;
+                    C::test  as  test;
+                    \\App\\C::test   as  test;
+                    \\App\\C::test   as private  test;
+                    \\App\\C::test   as public  test;
+                    \\App\\C::test   as protected  test;
+                }
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            class Test
+            {
+            use A;
+            use A\\B;
+            use A\\C
+            {
+            A\\C::test as test2;
+            test as test;
+            C::test as test;
+            \\App\\C::test as test;
+            \\App\\C::test as private test;
+            \\App\\C::test as public test;
+            \\App\\C::test as protected test;
+            }
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn consecutive_elements_are_spaced_after_brackets() {
+        let input = indoc! {"
+            <?php
+            class A {}
+            class B {}
+            $a = new A();
+            $b = new B();
+            class C {}
+        "};
+
+        let output = indoc! {"
+            <?php
+            class A
+            {
+            }
+            class B
+            {
+            }
+            $a = new A();
+            $b = new B();
+            class C
+            {
+            }
         "};
 
         assert_inputs(input, output);
