@@ -159,6 +159,12 @@ impl NormalizerFixer {
 
     fn handle_close_squiggly_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
+            if let Some(parent) = parent.parent() {
+                if parent.kind() == "anonymous_function_creation_expression" {
+                    return self.pass_through(&node, &source_code);
+                }
+            }
+
             if parent.kind() == "declaration_list" {
                 return self.pass_through(&node, &source_code);
             }
@@ -229,7 +235,13 @@ impl NormalizerFixer {
             }
         }
 
-        self.space_after(&node, &source_code)
+        if let Some(next) = node.next_sibling() {
+            if next.kind() == "name" {
+                return self.space_after(&node, &source_code);
+            }
+        }
+
+        self.pass_through(&node, &source_code)
     }
 
     fn handle_primitive_parameters(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
@@ -263,6 +275,21 @@ impl NormalizerFixer {
                 if next.kind() == "|" {
                     return self.pass_through(&node, &source_code);
                 }
+            }
+
+            if parent.kind() == "qualified_name" {
+                let sequence = self.get_node_sequence(&parent, &[
+                    Sequence::Parent,
+                    Sequence::Next,
+                ]);
+
+                if let Some(parent) = sequence {
+                    if parent.kind() == "|" {
+                        return self.pass_through(&node, &source_code);
+                    }
+                }
+
+                return self.space_after(&node, &source_code);
             }
 
             if parent.kind() == "named_type" {
@@ -324,7 +351,7 @@ impl NormalizerFixer {
                     return self.normalize_block(&child, &source_code);
                 }
 
-                // println!("{:?} {:?}",child.kind(), child.utf8_text(&source_code).unwrap());
+                // println!("{:?} {:?}", child.kind(), child.utf8_text(&source_code).unwrap());
 
                 match child.kind() {
                     "=" | "+=" | "-=" | "*=" | "/=" | "%=" |                                        // Assignment Operators
@@ -337,13 +364,14 @@ impl NormalizerFixer {
                     => self.handle_operators(&child, &source_code),
 
                     // Class related tokens
+                    "as" |
                     "=>" |
                     "extends" |
                     "implements" => self.space_before_and_after(&child, &source_code),
                     "class" => self.handle_class_kind(&child, &source_code),
                     "$" => self.handle_dollar_kind(&child, &source_code),
 
-                    "null" | "string" | "bool" | "float" | "int" |
+                    "null" | "string" | "bool" | "boolean" | "float" | "int" |
                     "array" | "mixed" | "object" | "callable" | "resource"
                     => self.handle_primitive_parameters(&child, &source_code),
 
@@ -686,7 +714,7 @@ mod tests {
 
         let output = indoc! {"
             <?php
-            function ()
+            function()
             {
             return 1;
             return 1;
@@ -790,10 +818,9 @@ mod tests {
             wrapper(
             $class
             ->icon(
-            function ()
+            function()
             {
             }
-
             )
             );
         "};
@@ -969,4 +996,71 @@ mod tests {
         assert_inputs(input, output);
     }
 
+    #[test]
+    fn while_loops() {
+        let input = indoc! {"
+            <?php
+            while  (true) {
+                do{
+                     $x++;
+                }  while ( true );
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            while(
+            true
+            )
+            {
+            do
+            {
+            $x++;
+            }
+            while(
+            true
+            );
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn foreach() {
+        let input = indoc! {"
+            <?php
+            foreach  ($a as $b=>$c) {}
+        "};
+
+        let output = indoc! {"
+            <?php
+            foreach(
+            $a as $b => $c
+            )
+            {
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn qualified_namespace_named_parameter() {
+        let input = indoc! {"
+            <?php
+            function(App\\Service\\A|\\Closure $a){};
+        "};
+
+        let output = indoc! {"
+            <?php
+            function(
+            App\\Service\\A | \\Closure $a
+            )
+            {
+            };
+        "};
+
+        assert_inputs(input, output);
+    }
 }
