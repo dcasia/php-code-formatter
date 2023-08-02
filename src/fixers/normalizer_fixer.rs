@@ -51,6 +51,16 @@ impl NormalizerFixer {
         false
     }
 
+    fn previous_is(&self, node: &Node, kind: &str) -> bool {
+        if let Some(next) = node.prev_sibling() {
+            if next.kind() == kind {
+                return true;
+            }
+        }
+
+        false
+    }
+
     fn is_within(&self, node: &Node, kinds: &[&str]) -> bool {
         kinds.contains(&node.kind())
     }
@@ -311,6 +321,18 @@ impl NormalizerFixer {
         self.pass_through(&node, &source_code)
     }
 
+    fn handle_use(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(parent) = node.parent() {
+            if let Some(previous) = parent.prev_sibling() {
+                if previous.kind() == "formal_parameters" {
+                    return self.space_before_and_after(&node, &source_code);
+                }
+            }
+        }
+
+        self.space_after(&node, &source_code)
+    }
+
     fn handle_name_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
             if self.next_is_within(&parent, &["|", "::", "use_list"]) {
@@ -422,8 +444,8 @@ impl NormalizerFixer {
                     "private" | "public" | "protected" => self.handle_visibility_modifier(&child, &source_code),
 
                     "namespace" |
-                    "use" |
                     "new" => self.space_after(&child, &source_code),
+                    "use" => self.handle_use(&child, &source_code),
 
                     "name" => self.handle_name_kind(&child, &source_code),
                     "return" => self.handle_return(&child, &source_code),
@@ -1198,6 +1220,25 @@ mod tests {
             class C
             {
             }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn use_on_function() {
+        let input = indoc! {"
+            <?php
+            function() use ($test){ };
+        "};
+
+        let output = indoc! {"
+            <?php
+            function() use (
+            $test
+            )
+            {
+            };
         "};
 
         assert_inputs(input, output);
