@@ -112,6 +112,16 @@ impl NormalizerFixer {
         self.space_after(&node, &source_code)
     }
 
+    fn handle_semicolon(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if let Some(next) = node.next_sibling() {
+            if next.kind() == ")" {
+                return self.pass_through(&node, &source_code);
+            }
+        }
+
+        self.line_break_after(&node, &source_code)
+    }
+
     fn handle_class_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(previous) = node.prev_sibling() {
             if previous.kind() == "abstract_modifier" {
@@ -332,7 +342,8 @@ impl NormalizerFixer {
                     "new" => self.space_after(&child, &source_code),
                     "name" => self.handle_name_kind(&child, &source_code),
                     "return" => self.handle_return(&child, &source_code),
-                    "," | ";" => self.line_break_after(&child, &source_code),
+                    ";" => self.handle_semicolon(&child, &source_code),
+                    "," => self.line_break_after(&child, &source_code),
                     "function" => self.handle_function(&child, &source_code),
                     "static" => self.handle_static_modifier(&child, &source_code),
                     "->" | "?->" => self.line_break_before(&child, &source_code),
@@ -901,4 +912,38 @@ mod tests {
 
         assert_inputs(input, output);
     }
+
+    #[test]
+    fn for_loops() {
+        let input = indoc! {"
+            <?php
+            for($i   = 0 ; $i  <  10;   $i++ ) {
+                    $test=1;
+                            for (;;){}
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            for(
+            $i = 0;
+            $i < 10;
+            $i++
+            )
+            {
+            $test = 1;
+            for(
+            ;
+            ;
+            )
+            {
+            }
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+
+
 }
