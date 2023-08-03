@@ -311,10 +311,8 @@ impl NormalizerFixer {
 
     fn handle_visibility_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
-            if let Some(next) = parent.next_sibling() {
-                if next.kind() == "readonly_modifier" {
-                    return self.space_after(&node, &source_code);
-                }
+            if self.next_is_within(&parent, &["property_element", "readonly_modifier", "union_type"]) {
+                return self.space_after(&node, &source_code);
             }
 
             if let Some(previous) = parent.prev_sibling() {
@@ -451,7 +449,7 @@ impl NormalizerFixer {
 
                     "readonly" | "final" |
                     "const" | "echo" |
-                    "namespace" |
+                    "namespace" | "interface" | "trait" |
                     "new" => self.space_after(&child, &source_code),
                     "use" => self.handle_use(&child, &source_code),
 
@@ -1297,6 +1295,58 @@ mod tests {
             {
             echo \"test\";
             }
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn class_properties() {
+        let input = indoc! {"
+            <?php
+            final class FooDecorator
+            {
+                private$foo;
+                private  string  $foo;
+                public  int  $foo;
+                protected  bool| string  $foo=  1;
+                private A | B $foo;
+                private A\\B | A | null  $foo;
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            final class FooDecorator
+            {
+            private $foo;
+            private string $foo;
+            public int $foo;
+            protected bool | string $foo = 1;
+            private A | B $foo;
+            private A\\B | A | null $foo;
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn interface_trait() {
+        let input = indoc! {"
+            <?php
+            interface Foo {}
+            trait Foo {}
+        "};
+
+        let output = indoc! {"
+            <?php
+            interface Foo
+            {
+            }
+            trait Foo
+            {
             }
         "};
 
