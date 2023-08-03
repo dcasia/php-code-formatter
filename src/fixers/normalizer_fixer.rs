@@ -41,6 +41,16 @@ impl NormalizerFixer {
         })
     }
 
+    fn parent_is(&self, node: &Node, kind: &str) -> bool {
+        if let Some(next) = node.parent() {
+            if next.kind() == kind {
+                return true;
+            }
+        }
+
+        false
+    }
+
     fn next_is(&self, node: &Node, kind: &str) -> bool {
         if let Some(next) = node.next_sibling() {
             if next.kind() == kind {
@@ -243,6 +253,10 @@ impl NormalizerFixer {
     }
 
     fn handle_close_array_bracket(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if self.parent_is(&node, "attribute_group") {
+            return self.line_break_after(&node, &source_code);
+        }
+
         if let Some(previous) = node.prev_sibling() {
             if ["[", ","].contains(&previous.kind()) {
                 return self.pass_through(&node, &source_code);
@@ -265,7 +279,7 @@ impl NormalizerFixer {
     fn handle_static_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
             if self.next_is_within(&parent, &["property_element", "union_type", "function"]) {
-                 return self.space_after(&node, &source_code);
+                return self.space_after(&node, &source_code);
             }
         }
 
@@ -333,6 +347,14 @@ impl NormalizerFixer {
 
     fn handle_name_kind(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
+            if self.parent_is(&parent, "attribute_group") {
+                if self.next_is(&parent, ",") {
+                    return self.pass_through(&node, &source_code);
+                }
+
+                return self.line_break_after(&node, &source_code);
+            }
+
             if self.next_is_within(&parent, &["|", "::", "use_list"]) {
                 return self.pass_through(&node, &source_code);
             }
@@ -348,6 +370,7 @@ impl NormalizerFixer {
                         return self.pass_through(&node, &source_code);
                     }
                 }
+
 
                 if self.next_is(&parent, ";") {
                     return self.pass_through(&node, &source_code);
@@ -447,6 +470,7 @@ impl NormalizerFixer {
                     "new" => self.space_after(&child, &source_code),
                     "use" => self.handle_use(&child, &source_code),
 
+                    "#[" => self.line_break_after(&child, &source_code),
                     "name" => self.handle_name_kind(&child, &source_code),
                     "return" => self.handle_return(&child, &source_code),
                     ";" => self.handle_semicolon(&child, &source_code),
@@ -1372,6 +1396,53 @@ mod tests {
             static A $var = 1;
             public static A\\B $var = 1;
             private static A\\B\\C $var = 1;
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn attributes() {
+        let input = indoc! {"
+            <?php
+            class Foo
+            {
+                #[ A]
+                private $attribute1 = 'value';
+                #[ A,  B ]
+                protected $attribute2 = 'value';
+                    #[ A ]
+                        #[ B ]
+                protected $attribute3 = 'value';
+                #[A,] public $attribute4 = 'value';
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            class Foo
+            {
+            #[
+            A
+            ]
+            private $attribute1 = 'value';
+            #[
+            A,
+            B
+            ]
+            protected $attribute2 = 'value';
+            #[
+            A
+            ]
+            #[
+            B
+            ]
+            protected $attribute3 = 'value';
+            #[
+            A,
+            ]
+            public $attribute4 = 'value';
             }
         "};
 
