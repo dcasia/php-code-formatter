@@ -264,6 +264,10 @@ impl NormalizerFixer {
 
     fn handle_static_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
+            if self.next_is_within(&parent, &["property_element", "union_type"]) {
+                 return self.space_after(&node, &source_code);
+            }
+
             if let Some(previous) = parent.prev_sibling() {
                 if previous.kind() == "visibility_modifier" {
                     return self.space_before(&node, &source_code);
@@ -311,7 +315,7 @@ impl NormalizerFixer {
 
     fn handle_visibility_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
-            if self.next_is_within(&parent, &["property_element", "readonly_modifier", "union_type"]) {
+            if self.next_is_within(&parent, &["property_element", "readonly_modifier", "union_type", "static_modifier"]) {
                 return self.space_after(&node, &source_code);
             }
 
@@ -1347,6 +1351,37 @@ mod tests {
             }
             trait Foo
             {
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn static_properties() {
+        let input = indoc! {"
+            <?php
+            class Foo
+            {
+                protected  static $var  =  1;
+                static  $var  =  1;
+                static  string  $var =  1;
+                static  A $var  = 1;
+                public  static  A\\B  $var  = 1;
+                private  static  A\\B\\C  $var  = 1;
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            class Foo
+            {
+            protected static $var = 1;
+            static $var = 1;
+            static string $var = 1;
+            static A $var = 1;
+            public static A\\B $var = 1;
+            private static A\\B\\C $var = 1;
             }
         "};
 
