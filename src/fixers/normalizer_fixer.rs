@@ -264,14 +264,8 @@ impl NormalizerFixer {
 
     fn handle_static_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
-            if self.next_is_within(&parent, &["property_element", "union_type"]) {
+            if self.next_is_within(&parent, &["property_element", "union_type", "function"]) {
                  return self.space_after(&node, &source_code);
-            }
-
-            if let Some(previous) = parent.prev_sibling() {
-                if previous.kind() == "visibility_modifier" {
-                    return self.space_before(&node, &source_code);
-                }
             }
         }
 
@@ -279,10 +273,6 @@ impl NormalizerFixer {
     }
 
     fn handle_function(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
-        if self.previous_is_within(node, &["static_modifier", "visibility_modifier"]) {
-            return self.space_before_and_after(&node, &source_code);
-        }
-
         if self.next_is(node, "name") {
             return self.space_after(&node, &source_code);
         }
@@ -315,7 +305,7 @@ impl NormalizerFixer {
 
     fn handle_visibility_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
-            if self.next_is_within(&parent, &["property_element", "readonly_modifier", "union_type", "static_modifier"]) {
+            if self.next_is_within(&parent, &["property_element", "readonly_modifier", "union_type", "static_modifier", "function"]) {
                 return self.space_after(&node, &source_code);
             }
 
