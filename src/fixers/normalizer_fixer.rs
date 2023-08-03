@@ -443,6 +443,7 @@ impl NormalizerFixer {
 
                     "private" | "public" | "protected" => self.handle_visibility_modifier(&child, &source_code),
 
+                    "const" |
                     "namespace" |
                     "new" => self.space_after(&child, &source_code),
                     "use" => self.handle_use(&child, &source_code),
@@ -1239,6 +1240,26 @@ mod tests {
             )
             {
             };
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn const_variables() {
+        let input = indoc! {"
+            <?php
+            const   SAMPLE   =  1;
+            class Test {   const    SAMPLE = 1; }
+        "};
+
+        let output = indoc! {"
+            <?php
+            const SAMPLE = 1;
+            class Test
+            {
+            const SAMPLE = 1;
+            }
         "};
 
         assert_inputs(input, output);
