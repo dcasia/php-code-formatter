@@ -311,6 +311,12 @@ impl NormalizerFixer {
 
     fn handle_visibility_modifier(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
+            if let Some(next) = parent.next_sibling() {
+                if next.kind() == "readonly_modifier" {
+                    return self.space_after(&node, &source_code);
+                }
+            }
+
             if let Some(previous) = parent.prev_sibling() {
                 if previous.kind() == "as" {
                     return self.space_after(&node, &source_code);
@@ -443,7 +449,8 @@ impl NormalizerFixer {
 
                     "private" | "public" | "protected" => self.handle_visibility_modifier(&child, &source_code),
 
-                    "const" |
+                    "readonly" | "final" |
+                    "const" | "echo" |
                     "namespace" |
                     "new" => self.space_after(&child, &source_code),
                     "use" => self.handle_use(&child, &source_code),
@@ -1259,6 +1266,37 @@ mod tests {
             class Test
             {
             const SAMPLE = 1;
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn final_echo_readonly() {
+        let input = indoc! {"
+            <?php
+               final   readonly  class  Test
+            {
+                public   readonly  string  $title;
+                final   const  X  =  \"foo\";
+                final   public  function  test()
+                    {
+                    echo        \"test\";
+                }
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            final readonly class Test
+            {
+            public readonly string $title;
+            final const X = \"foo\";
+            final public function test()
+            {
+            echo \"test\";
+            }
             }
         "};
 
