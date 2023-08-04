@@ -333,6 +333,14 @@ impl NormalizerFixer {
         self.pass_through(&node, &source_code)
     }
 
+    fn handle_comment(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
+        if node.next_sibling().is_some() {
+            return self.line_break_after(&node, &source_code);
+        }
+
+        self.pass_through(&node, &source_code)
+    }
+
     fn handle_use(&self, node: &Node, source_code: &Vec<u8>) -> Vec<u8> {
         if let Some(parent) = node.parent() {
             if let Some(previous) = parent.prev_sibling() {
@@ -469,6 +477,8 @@ impl NormalizerFixer {
                     "namespace" | "interface" | "trait" |
                     "new" => self.space_after(&child, &source_code),
                     "use" => self.handle_use(&child, &source_code),
+
+                    "comment" => self.handle_comment(&child, &source_code),
 
                     "#[" => self.line_break_after(&child, &source_code),
                     "name" => self.handle_name_kind(&child, &source_code),
@@ -1443,6 +1453,32 @@ mod tests {
             A,
             ]
             public $attribute4 = 'value';
+            }
+        "};
+
+        assert_inputs(input, output);
+    }
+
+    #[test]
+    fn double_slash_comments() {
+        let input = indoc! {"
+            <?php
+            function test() {
+             // comment 1
+             // comment 2
+                $variable = 1;
+                    // comment 3
+            }
+        "};
+
+        let output = indoc! {"
+            <?php
+            function test()
+            {
+            // comment 1
+            // comment 2
+            $variable = 1;
+            // comment 3
             }
         "};
 
